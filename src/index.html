@@ -1105,6 +1105,10 @@
                                         </source-switch>
                                     </div>
                                     <div class="device-card--tile">
+                                        <h3 class="device-card--tile--header">Match</h3>
+                                        <power-match-status class="data-view device-card--tile--value">off</power-match-status>
+                                    </div>
+                                    <div class="device-card--tile">
                                         <source-switch class="source-switch"
                                                        for="speed"
                                                        use="ble:powerMeter">
@@ -1479,6 +1483,15 @@
                                 <auto-start class="option--value">
                                     ON
                                 </auto-start>
+                            </div>
+                        </div>
+
+                        <div class="list--row--outer">
+                            <div class="list--row--inner option">
+                                <div class="option--name">Power Match</div>
+                                <power-match-setting class="option--value">
+                                    ON
+                                </power-match-setting>
                             </div>
                         </div>
 

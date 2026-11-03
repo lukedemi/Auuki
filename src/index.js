@@ -1,6 +1,7 @@
 import { xf } from './functions.js';
 import './db.js';
 import './views/views.js';
+import './power-match.js';
 import './ble/devices.js';
 import './ble/obc/controls.js';
 import './watch.js';

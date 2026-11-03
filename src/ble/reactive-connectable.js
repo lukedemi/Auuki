@@ -73,6 +73,12 @@ function ReactiveConnectable(args = {}) {
     }
 
     function onData(data) {
+        // every device's own power reading, whichever is the source:
+        // power-match.js pairs the trainer's with the power meter's
+        if('power' in data) {
+            xf.dispatch(`${identifier}:power`, data.power);
+        }
+
         if('power' in data && models.sources.isSource('power', identifier)) {
             xf.dispatch(`power`, data.power);
         }
@@ -170,7 +176,8 @@ function ReactiveConnectable(args = {}) {
         if(equals(deviceType, Device.controllable)) {
             xf.sub('db:mode',             onMode, signal);
             xf.sub('db:weight',           onUserWeight, signal);
-            xf.sub('db:powerTarget',      onPowerTarget, signal);
+            // db:powerTarget passed through power-match.js
+            xf.sub('trainer:powerTarget', onPowerTarget, signal);
             xf.sub('db:resistanceTarget', onResistanceTarget, signal);
             xf.sub('db:slopeTarget',      onSlopeTarget, signal);
             xf.sub('ui:trainer:reset',    onTrainerReset, signal);
