@@ -1733,6 +1733,22 @@ class PowerMatchSetting extends AutoPause {
 
 customElements.define('power-match-setting', PowerMatchSetting);
 
+// Settings > Power Match Debug: the overlay in power-match-debug.js
+class PowerMatchDebugSetting extends AutoPause {
+    postInit() {
+        this.effect  = 'sources';
+        this.key     = 'powerMatchDebug';
+        this.state   = false;
+        this.values  = {on: {powerMatchDebug: true}, off: {powerMatchDebug: false}};
+    }
+    onUpdate(value) {
+        this.state = value[this.key] ?? false;
+        this.render();
+    }
+}
+
+customElements.define('power-match-debug-setting', PowerMatchDebugSetting);
+
 // The power meter card's Match tile: how far the meter reads from the
 // trainer, e.g. -3.1% = the pedals read 3.1% below the trainer, so the
 // trainer is being asked for 3.2% more than the target

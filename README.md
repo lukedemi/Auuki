@@ -1,5 +1,24 @@
 <img alt="Auuki Indoor Cyling app for Structured Training" src="https://github.com/user-attachments/assets/292a3216-2f52-4994-9b15-614446e41912" />
 
+# This fork (lukedemi/Auuki)
+
+Self-hosted at **auuki.d3-mi.com** (Cloudflare Pages, behind Access). Changes on top of upstream:
+
+- **Power Match** (`src/power-match.js`): with the Power source set to the Bluetooth power meter, ERG holds the *meter's* reading on the target instead of the trainer's. It learns the meter/trainer ratio from both live streams and sends the trainer `target / ratio`. Settings → Power Match (on by default); the power meter card's Match tile shows the live offset.
+- **Power Match Debug**: Settings → Power Match Debug, or `?debug` in the URL, opens an overlay with both readings, the ratio, the target against what the trainer was sent, a CSV log of every sample (`csv`), and a no-hardware simulator (`sim`, with the meter/trainer ratio to fake). `window.powerMatch` in the console. `/version.json` names the deployed commit.
+
+Deploy (from `master`, by hand — nothing deploys on merge):
+
+```bash
+npm install
+npm run release
+python3 ../homeassistant/scripts/cf-pages dist --name auuki --domain auuki.d3-mi.com
+```
+
+`release` builds `dist/` and writes `dist/version.json`; `cf-pages` puts Access (the `household` group) in front of the project before uploading and checks the gate afterwards.
+
+---
+
 # Auuki
 Auuki is a powerful, no-nonsense app built for hammering out **structured workouts** on a smart trainer, right in your browser. No installs, no dependencies, no slow updates taking from precious training time.
 

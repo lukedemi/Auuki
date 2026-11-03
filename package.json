@@ -8,7 +8,8 @@
         "test": "jest",
         "start": "parcel",
         "starttls": "parcel --cert ./dev_cert/cert.pem --key ./dev_cert/key.pem",
-        "build": "parcel build"
+        "build": "parcel build",
+        "release": "rm -rf dist && parcel build && node scripts/version.mjs"
     },
     "devDependencies": {
         "@babel/core": "^7.29.7",
