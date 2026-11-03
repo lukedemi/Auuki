@@ -161,4 +161,75 @@ describe('PowerMatch wiring', () => {
         xf.dispatch('ble:powerMeter:disconnected');
         expect(sent).toContain(250);
     });
+
+    test('logs every sample and event, and exports CSV', () => {
+        xf.dispatch('db:sources', {sources: {power: 'ble:powerMeter'}});
+        xf.dispatch('db:powerTarget', {powerTarget: 250});
+        tick(20, 250, 240);
+        const log = pm.log();
+        expect(log.length).toBeGreaterThanOrEqual(21);
+        expect(log.some(r => r.event === 'target')).toBe(true);
+
+        const lines = pm.csv().trim().split('\n');
+        expect(lines[0]).toBe('t,time,event,enabled,sim,ready,paired,ratio,target,sent,trainer,meter,emaTrainer,emaMeter,source');
+        expect(lines.length).toBe(log.length + 1);
+
+        pm.clear();
+        expect(pm.log().length).toBe(1);
+    });
+
+    test('learns while the trainer is the source, applies once switched', () => {
+        xf.dispatch('db:sources', {sources: {power: 'ble:controllable'}});
+        xf.dispatch('db:powerTarget', {powerTarget: 250});
+        tick(120, 250, 240);
+        expect(pm.trainerTarget()).toBe(250);
+        sent.length = 0;
+        xf.dispatch('db:sources', {sources: {power: 'ble:powerMeter'}});
+        expect(sent).toContain(260);
+    });
+});
+
+describe('PowerMatch simulation', () => {
+    let pm, clock, sent, abort;
+
+    beforeEach(() => {
+        jest.useFakeTimers();
+        clock = 0;
+        sent = [];
+        abort = new AbortController();
+        pm = PowerMatch({now: () => clock});
+        pm.start();
+        xf.sub('trainer:powerTarget', v => sent.push(v), {signal: abort.signal});
+    });
+
+    afterEach(() => {
+        pm.stop();
+        abort.abort();
+        jest.useRealTimers();
+    });
+
+    function run(seconds) {
+        for(let i = 0; i < seconds; i++) {
+            clock += 1000;
+            jest.advanceTimersByTime(1000);
+        }
+    }
+
+    test('the simulated meter converges on the target', () => {
+        xf.dispatch('db:sources', {sources: {power: 'ble:controllable'}});
+        xf.dispatch('db:powerTarget', {powerTarget: 250});
+        pm.simulate(true, {offset: 1.05});
+        expect(pm.isSimulating()).toBe(true);
+        run(180);
+
+        const recent = pm.log().slice(-30).filter(r => r.event === '');
+        const meter = recent.reduce((a, r) => a + r.meter, 0) / recent.length;
+        expect(Math.abs(meter - 250)).toBeLessThan(4);
+        expect(pm.trainerTarget()).toBeGreaterThan(234);
+        expect(pm.trainerTarget()).toBeLessThan(242);
+
+        pm.simulate(false);
+        expect(pm.isSimulating()).toBe(false);
+        expect(pm.trainerTarget()).toBe(250);
+    });
 });

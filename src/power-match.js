@@ -99,6 +99,18 @@ function PowerMatchCore(args = {}) {
         return Math.round(target / ratio());
     }
 
+    // for the debug panel and log
+    function state() {
+        return {
+            trainer: trainer?.power,
+            emaTrainer,
+            emaMeter,
+            paired,
+            ready: isReady(),
+            ratio: ratio(),
+        };
+    }
+
     reset();
 
     return Object.freeze({
@@ -108,6 +120,7 @@ function PowerMatchCore(args = {}) {
         ratio,
         adjust,
         reset,
+        state,
         config: c,
     });
 }
@@ -117,16 +130,34 @@ const trainerId = 'ble:controllable';
 
 // Wires the core to the app: reads db:powerTarget and the two power streams,
 // writes trainer:powerTarget, which is what the trainer actually receives.
+//
+// The core learns whenever both devices are connected, whatever the power
+// source is, so the offset is already known when the source is switched to
+// the meter. `enabled` only decides whether the correction is applied.
+//
+// Debugging (Settings > Power Match Debug, or ?debug in the URL):
+// - powerMatch:debug carries a snapshot on every meter sample and event
+// - a log of those snapshots, downloadable as CSV
+// - simulate(): fake trainer + meter streams, the trainer following what it
+//   was commanded with a little ERG lag, the meter off by a set ratio, so the
+//   whole loop runs with no hardware
+// - window.powerMatch in the console
 function PowerMatch(args = {}) {
     const core = PowerMatchCore(args);
     const now  = args.now ?? (() => Date.now());
+    const maxRows = args.maxRows ?? 8 * 3600 * 2;
 
+    let sources  = {};
     let enabled  = false;
     let target   = 0;
     let lastSent;
     let lastSentT = 0;
+    let meterPower;
+    let sim;              // {offset, power, timer}
+    const log = [];
 
-    function isEnabled(sources = {}) {
+    function isEnabled() {
+        if(exists(sim)) return true;
         return equals(sources.power, meterId) && (sources.powerMatch ?? true);
     }
 
@@ -134,12 +165,41 @@ function PowerMatch(args = {}) {
         return enabled ? core.adjust(target) : target;
     }
 
-    function send() {
+    function snapshot(event = '') {
+        const st = core.state();
+        return {
+            t:          now(),
+            event,
+            enabled,
+            sim:        exists(sim),
+            ready:      st.ready,
+            paired:     st.paired,
+            ratio:      st.ratio,
+            target,
+            sent:       lastSent ?? target,
+            trainer:    st.trainer,
+            meter:      meterPower,
+            emaTrainer: st.emaTrainer,
+            emaMeter:   st.emaMeter,
+            source:     sources.power,
+        };
+    }
+
+    function record(event = '') {
+        const row = snapshot(event);
+        log.push(row);
+        if(log.length > maxRows) log.shift();
+        xf.dispatch('powerMatch:debug', row);
+        return row;
+    }
+
+    function send(event = 'send') {
         const value = trainerTarget();
         lastSent  = value;
         lastSentT = now();
         xf.dispatch('trainer:powerTarget', value);
         status();
+        record(event);
     }
 
     function status() {
@@ -153,17 +213,21 @@ function PowerMatch(args = {}) {
         });
     }
 
-    function onSources(sources) {
-        const next = isEnabled(sources);
+    function updateEnabled(event) {
+        const next = isEnabled();
         if(equals(next, enabled)) return;
         enabled = next;
-        core.reset();
-        send();
+        send(event ?? (enabled ? 'enable' : 'disable'));
+    }
+
+    function onSources(value = {}) {
+        sources = Object.assign({}, value);
+        updateEnabled();
     }
 
     function onPowerTarget(value) {
         target = value;
-        send();
+        send('target');
     }
 
     function onTrainerPower(power) {
@@ -171,23 +235,108 @@ function PowerMatch(args = {}) {
     }
 
     function onMeterPower(power) {
-        if(!enabled) return;
+        meterPower = power;
         core.onMeter(power, now());
 
-        if(target <= 0 || !core.isReady()) return;
+        if(enabled && target > 0 && core.isReady()) {
+            const value = core.adjust(target);
+            if(Math.abs(value - (lastSent ?? target)) >= core.config.resendDelta &&
+               (now() - lastSentT) >= core.config.resendEvery) {
+                send('correct');
+                return;
+            }
+        }
+        status();
+        record();
+    }
 
-        const value = core.adjust(target);
-        if(Math.abs(value - (lastSent ?? target)) >= core.config.resendDelta &&
-           (now() - lastSentT) >= core.config.resendEvery) {
-            send();
-        } else {
-            status();
+    function onDisconnect(event) {
+        return function() {
+            if(exists(sim)) return;
+            core.reset();
+            meterPower = undefined;
+            send(event);
+        };
+    }
+
+    // simulation
+    function noise(amplitude) {
+        return (Math.random() * 2 - 1) * amplitude;
+    }
+
+    function simTick() {
+        const commanded = lastSent ?? target;
+        const goal = commanded > 0 ? commanded : 150;
+        sim.power += 0.5 * (goal - sim.power);
+        xf.dispatch(`${trainerId}:power`, Math.round(sim.power + noise(3)));
+        xf.dispatch(`${meterId}:power`,   Math.round(sim.power * sim.offset + noise(5)));
+    }
+
+    function simulate(on = true, opts = {}) {
+        if(on) {
+            const offset = Number(opts.offset ?? sim?.offset ?? 1.03);
+            if(exists(sim)) {
+                sim.offset = offset;
+                record('sim:offset');
+                return;
+            }
+            core.reset();
+            sim = {offset, power: target > 0 ? target : 150, timer: undefined};
+            sim.timer = setInterval(simTick, args.simInterval ?? 1000);
+            updateEnabled('sim:start');
+            record('sim:start');
+        } else if(exists(sim)) {
+            clearInterval(sim.timer);
+            sim = undefined;
+            core.reset();
+            meterPower = undefined;
+            enabled = isEnabled();
+            send('sim:stop');
         }
     }
 
-    function onDisconnect() {
-        core.reset();
-        send();
+    function isSimulating() {
+        return exists(sim);
+    }
+
+    // log export
+    const columns = [
+        't', 'time', 'event', 'enabled', 'sim', 'ready', 'paired', 'ratio',
+        'target', 'sent', 'trainer', 'meter', 'emaTrainer', 'emaMeter', 'source',
+    ];
+
+    function fmt(value) {
+        if(!exists(value)) return '';
+        if(typeof value === 'number' && !Number.isInteger(value)) {
+            return value.toFixed(4);
+        }
+        return String(value);
+    }
+
+    function csv() {
+        const lines = [columns.join(',')];
+        for(const row of log) {
+            const r = Object.assign({}, row, {time: new Date(row.t).toISOString()});
+            lines.push(columns.map(c => fmt(r[c])).join(','));
+        }
+        return lines.join('\n') + '\n';
+    }
+
+    function download() {
+        const blob = new Blob([csv()], {type: 'text/csv'});
+        const a = document.createElement('a');
+        const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+        a.href = URL.createObjectURL(blob);
+        a.download = `power-match-${stamp}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    }
+
+    function clear() {
+        log.length = 0;
+        record('clear');
     }
 
     let abortController;
@@ -200,11 +349,12 @@ function PowerMatch(args = {}) {
         xf.sub('db:powerTarget',              onPowerTarget, signal);
         xf.sub(`${trainerId}:power`,          onTrainerPower, signal);
         xf.sub(`${meterId}:power`,            onMeterPower, signal);
-        xf.sub(`${meterId}:disconnected`,     onDisconnect, signal);
-        xf.sub(`${trainerId}:disconnected`,   onDisconnect, signal);
+        xf.sub(`${meterId}:disconnected`,     onDisconnect('meter:disconnect'), signal);
+        xf.sub(`${trainerId}:disconnected`,   onDisconnect('trainer:disconnect'), signal);
     }
 
     function stop() {
+        simulate(false);
         abortController?.abort();
     }
 
@@ -213,11 +363,22 @@ function PowerMatch(args = {}) {
         stop,
         core,
         trainerTarget,
+        snapshot,
+        simulate,
+        isSimulating,
+        log: () => log,
+        csv,
+        download,
+        clear,
     });
 }
 
 const powerMatch = PowerMatch();
 powerMatch.start();
+
+if(typeof window !== 'undefined') {
+    window.powerMatch = powerMatch;
+}
 
 export default powerMatch;
 
