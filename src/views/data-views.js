@@ -1716,6 +1716,40 @@ class AutoStart extends AutoPause {
 
 customElements.define('auto-start', AutoStart);
 
+// Settings > Power Match: On by default; only acts when the power source is
+// the Bluetooth power meter (see power-match.js)
+class PowerMatchSetting extends AutoPause {
+    postInit() {
+        this.effect  = 'sources';
+        this.key     = 'powerMatch';
+        this.state   = true;
+        this.values  = {on: {powerMatch: true}, off: {powerMatch: false}};
+    }
+    onUpdate(value) {
+        this.state = value[this.key] ?? true;
+        this.render();
+    }
+}
+
+customElements.define('power-match-setting', PowerMatchSetting);
+
+// The power meter card's Match tile: how far the meter reads from the
+// trainer, e.g. -3.1% = the pedals read 3.1% below the trainer, so the
+// trainer is being asked for 3.2% more than the target
+class PowerMatchStatus extends DataView {
+    getDefaults() {
+        return { prop: 'powerMatch:status', };
+    }
+    getValue(status = {}) {
+        if(!status.enabled) return 'off';
+        if(!status.active) return 'learning';
+        const pct = (status.ratio - 1) * 100;
+        return `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`;
+    }
+}
+
+customElements.define('power-match-status', PowerMatchStatus);
+
 class Theme extends DataView {
     postInit() {
         this.effect  = 'sources';
