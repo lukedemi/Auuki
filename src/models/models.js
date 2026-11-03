@@ -18,6 +18,13 @@ import { fit } from '../fit/fit.js';
 import { Device, Status, ControlMode, } from '../ble/enums.js';
 import { TimerStatus, EventType, } from '../activity/enums.js';
 
+// atob gives one character per byte, which mangles any UTF-8 in a workout
+// (an emoji or a dash in an intervals.icu workout name)
+function decodeBase64Utf8(b64 = '') {
+    const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+    return new TextDecoder('utf-8').decode(bytes);
+}
+
 class Model {
     constructor(args = {}) {
         this.init(args);
@@ -700,7 +707,7 @@ class Workout extends Model {
         return zwo.readToInterval(result);
     }
     fromIntervalsEvent(event) {
-        const workout = this.parse(atob(event.workout_file_base64));
+        const workout = this.parse(decodeBase64Utf8(event.workout_file_base64));
         workout.meta.planned = true;
         workout.meta.startDateLocal = event.start_date_local;
         workout.id = uuid();

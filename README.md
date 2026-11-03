@@ -5,6 +5,7 @@
 Self-hosted at **auuki.d3-mi.com** (Cloudflare Pages, behind Access). Changes on top of upstream:
 
 - **Power Match** (`src/power-match.js`): with the Power source set to the Bluetooth power meter, ERG holds the *meter's* reading on the target instead of the trainer's. It learns the meter/trainer ratio from both live streams and sends the trainer `target / ratio`. Settings → Power Match (on by default); the power meter card's Match tile shows the live offset.
+- **intervals.icu, direct** (`src/models/intervals-direct.js`): upstream reaches intervals.icu through api.auuki.com, a closed backend; here the browser talks to the intervals.icu API itself with the athlete's API key (Settings → Intervals.icu, stored in that browser only). The Planned list shows the week's rides from the intervals.icu calendar as .zwo (strength sessions filtered out), FTP and weight come from intervals.icu, and the intervals.icu button on a saved activity uploads the .fit (with an `external_id`, so a repeat upload is a no-op). Off auuki.com the Auuki account backend is skipped entirely.
 - **Power Match Debug**: Settings → Power Match Debug, or `?debug` in the URL, opens an overlay with both readings, the ratio, the target against what the trainer was sent, a CSV log of every sample (`csv`), and a no-hardware simulator (`sim`, with the meter/trainer ratio to fake). `window.powerMatch` in the console. `/version.json` names the deployed commit.
 
 Deploy (from `master`, by hand — nothing deploys on merge):

@@ -161,6 +161,13 @@ class AuthForms extends HTMLElement {
             this.error('Wrong credentials or Authentication error');
             return;
         }
+        if(action === ':self-hosted') {
+            this.switch('', this.el.tab);
+            this.switch('', this.el.password);
+            this.switch('', this.el.passkey);
+            this.error('Self-hosted copy: there are no Auuki accounts here. Connect intervals.icu with an API key under Settings → Intervals.icu.');
+            return;
+        }
         if(action === ':no-api') {
             this.switch('', this.el.tab);
             this.switch('', this.el.password);

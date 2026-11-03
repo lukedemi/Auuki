@@ -1585,7 +1585,10 @@ class ModalError extends HTMLElement {
         if(msg === DialogMsg.noAuth) {
             return `Your session is over. You need to login again.`;
         };
-        return '';
+        // any other message is shown as plain text
+        const el = document.createElement('div');
+        el.textContent = String(msg ?? '');
+        return el.innerHTML;
     }
 }
 
