@@ -1,3 +1,8 @@
+function hasAuukiApi() {
+    const host = globalThis.location?.hostname ?? '';
+    return host === 'auuki.com' || host.endsWith('.auuki.com');
+}
+
 
 class Config {
     #defaultStravaClientId = 0;
@@ -9,7 +14,10 @@ class Config {
             // PWA_URI: "http://localhost:1234",
             // API_URI: "http://localhost:8080",
             PWA_URI: window.location.origin ?? "https://auuki.com",
-            API_URI: "https://api.auuki.com",
+            // the closed Auuki backend (accounts, OAuth); only reachable
+            // from auuki.com itself. Self-hosted, there is none, and
+            // intervals.icu is reached directly (intervals-direct.js)
+            API_URI: hasAuukiApi() ? "https://api.auuki.com" : "",
             STRAVA_CLIENT_ID: this.defaultStravaClientId,
             INTERVALS_CLIENT_ID: this.defaultIntervalsClientId,
             TRAINING_PEAKS_CLIENT_ID: this.defaultTrainingPeaksClientId,
@@ -22,6 +30,9 @@ class Config {
     }
     get() {
         return this.env;
+    }
+    hasApi() {
+        return this.env.API_URI !== '';
     }
 }
 

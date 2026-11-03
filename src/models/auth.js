@@ -11,7 +11,7 @@ function Auth(args = {}) {
     const pwa_uri = config.get().PWA_URI;
 
     let _loggedIn = false;
-    let _hasApi = true;
+    let _hasApi = config.hasApi();
 
     let _turnstileLoaded = false;
     let _turnstileId;
@@ -262,6 +262,12 @@ function Auth(args = {}) {
     }
 
     async function status() {
+        // self-hosted: no Auuki backend to ask, and no error to show for it
+        if(!config.hasApi()) {
+            xf.dispatch('action:auth', ':self-hosted');
+            return {strava: false, intervals: intervals.direct.isConfigured(), trainingPeaks: false};
+        }
+
         const url = `${api_uri}/api/rpc`;
 
         try {

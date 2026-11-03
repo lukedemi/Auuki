@@ -2,6 +2,7 @@ import { xf, once, print, exists, } from '../functions.js';
 import { isoDate, } from '../utils.js';
 import { OAuthService, DialogMsg, stateParam, } from './enums.js';
 import config from './config.js';
+import direct from './intervals-direct.js';
 
 function Intervals(args = {}) {
     const serviceName = OAuthService.intervals;
@@ -96,6 +97,21 @@ function Intervals(args = {}) {
     async function uploadWorkout(record) {
         const blob = record.blob;
         const workoutName = record.summary?.name ?? 'Powered by Auuki workout';
+
+        if(direct.isConfigured()) {
+            try {
+                const result = await direct.upload(blob, {
+                    name: workoutName,
+                    externalId: `auuki-${record.id ?? record.summary?.id}`,
+                });
+                console.log(`:intervals :direct :upload :success`, result);
+                return ':success';
+            } catch(error) {
+                console.error(`:intervals :direct :upload :fail`, error);
+                xf.dispatch('ui:modal:error:open', `intervals.icu upload failed: ${error.message}`);
+                return ':fail';
+            }
+        }
         const url = `${api_uri}/api/intervals/upload`;
 
         const formData = new FormData();
@@ -170,6 +186,19 @@ function Intervals(args = {}) {
     // String, String -> Void
     // "", ""
     async function wod(oldest = isoDate(), newest = isoDate()) {
+        if(direct.isConfigured()) {
+            try {
+                const data = await direct.events(oldest, newest);
+                xf.dispatch('action:planned', ':intervals:wod:success');
+                console.log(`:intervals :direct :wod`, data.length);
+                return data;
+            } catch(error) {
+                xf.dispatch('action:planned', ':intervals:wod:fail');
+                console.error(`:intervals :direct :wod :fail`, error);
+                return [];
+            }
+        }
+
         const url = `${api_uri}/api/intervals/events` +
               '?' +
               new URLSearchParams({
@@ -295,6 +324,18 @@ function Intervals(args = {}) {
         //         max_hr: Int,
         //     }]
         // }
+        if(direct.isConfigured()) {
+            try {
+                const data = await direct.athlete();
+                xf.dispatch('action:athlete', ':intervals:athlete:success');
+                return athleteToSettings(data);
+            } catch(error) {
+                xf.dispatch('action:athlete', ':intervals:athlete:fail');
+                console.error(`:intervals :direct :athlete :fail`, error);
+                return athleteToSettings();
+            }
+        }
+
         const url = `${api_uri}/api/intervals/athlete`;
 
         try {
@@ -333,6 +374,7 @@ function Intervals(args = {}) {
         wod,
         getAthlete,
         athleteToSettings,
+        direct,
 
         wodMock,
     });
