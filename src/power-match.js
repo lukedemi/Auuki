@@ -136,6 +136,11 @@ function PowerMatchCore(args = {}) {
         return Math.round(target / ratio());
     }
 
+    // the next meter sample starts a new pair (after samples were skipped)
+    function breakPair() {
+        lastT = undefined;
+    }
+
     // for the debug panel and log
     function state() {
         return {
@@ -157,6 +162,7 @@ function PowerMatchCore(args = {}) {
         ratio,
         adjust,
         reset,
+        breakPair,
         state,
         config: c,
     });
@@ -209,19 +215,48 @@ function PowerMatch(args = {}) {
     const EASE_FLOOR = args.easeFloor ?? 100;     // W while paused
     const EASE_MS    = args.easeMs ?? 20000;      // the ramp back up
     let watchState = 'stopped';
-    let ramp = null;                              // {from, start}
+    let ramp = null;                              // {from, start, ms}
     let rampTimer;
+
+    // Interval changes (this fork, Nov 13, 2026, rider: "when I start a new
+    // interval ... Power Match has a lot of trouble ... I have to really
+    // punch the pedals at the start of intervals"). For the first seconds
+    // of a new target the trainer's ERG is still catching up and the rider
+    // is spinning up, so the pedals and the trainer disagree for reasons
+    // that have nothing to do with calibration. So after a change of 10 W+
+    // the ratio is held: nothing learned and no corrections for 15 s, the
+    // new target sent with the ratio already known. A step up of 30 W+
+    // ramps in over 5 s instead of landing as a wall.
+    const STEP_MIN_W   = args.stepMinW ?? 10;
+    const STEP_HOLD_MS = args.stepHoldMs ?? 15000;
+    const STEP_RAMP_W  = args.stepRampW ?? 30;
+    const STEP_RAMP_MS = args.stepRampMs ?? 5000;
+    let holdUntil = 0;
 
     function eased(value) {
         if(!(value > 0)) return value;
         if(watchState === 'paused') return Math.min(value, EASE_FLOOR);
         if(ramp) {
-            const k = (now() - ramp.start) / EASE_MS;
+            const k = (now() - ramp.start) / ramp.ms;
             if(k >= 1) { ramp = null; return value; }
             const from = Math.min(ramp.from, value);
             return Math.round(from + (value - from) * k);
         }
         return value;
+    }
+
+    function startRamp(from, ms, event) {
+        ramp = {from, start: now(), ms};
+        send(event);
+        clearInterval(rampTimer);
+        rampTimer = setInterval(() => {
+            send(ramp ? 'ease' : 'ease:done');
+            if(!ramp) clearInterval(rampTimer);
+        }, args.easeTick ?? 1000);
+    }
+
+    function isHolding() {
+        return now() < holdUntil;
     }
 
     function onWatchStatus(state) {
@@ -232,13 +267,7 @@ function PowerMatch(args = {}) {
             send('ease:paused');
         }
         if(state === 'started' && was !== 'started') {
-            ramp = {from: Math.min(EASE_FLOOR, lastSent ?? EASE_FLOOR), start: now()};
-            send('ease:resume');
-            clearInterval(rampTimer);
-            rampTimer = setInterval(() => {
-                send(ramp ? 'ease' : 'ease:done');
-                if(!ramp) clearInterval(rampTimer);
-            }, args.easeTick ?? 1000);
+            startRamp(Math.min(EASE_FLOOR, lastSent ?? EASE_FLOOR), EASE_MS, 'ease:resume');
         }
         if(state === 'stopped') {
             ramp = null;
@@ -273,6 +302,7 @@ function PowerMatch(args = {}) {
             source:     sources.power,
             steady:     Math.round((now() - targetSince) / 1000),
             calm:       calm().k,
+            hold:       isHolding(),
         };
     }
 
@@ -321,8 +351,17 @@ function PowerMatch(args = {}) {
     }
 
     function onPowerTarget(value) {
-        if(value !== target) targetSince = now();
+        const was = target;
+        if(value !== was) targetSince = now();
         target = value;
+        if(Math.abs(value - was) >= STEP_MIN_W) {
+            holdUntil = now() + STEP_HOLD_MS;
+            core.breakPair();
+        }
+        if(was > 0 && value - was >= STEP_RAMP_W && watchState === 'started' && !ramp) {
+            startRamp(lastSent ?? was, STEP_RAMP_MS, 'step:ramp');
+            return;
+        }
         send('target');
     }
 
@@ -333,6 +372,11 @@ function PowerMatch(args = {}) {
     function onMeterPower(power) {
         meterPower = power;
         const c = calm();
+        if(isHolding()) {
+            status();
+            record();
+            return;
+        }
         core.onMeter(power, now(), c.tau);
 
         if(enabled && target > 0 && core.isReady() && !isEasing()) {
@@ -399,7 +443,7 @@ function PowerMatch(args = {}) {
     const columns = [
         't', 'time', 'event', 'enabled', 'sim', 'ready', 'paired', 'ratio',
         'target', 'sent', 'trainer', 'meter', 'emaTrainer', 'emaMeter', 'source',
-        'steady', 'calm',
+        'steady', 'calm', 'hold',
     ];
 
     function fmt(value) {

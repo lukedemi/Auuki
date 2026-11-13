@@ -12,6 +12,7 @@
 
 import { xf, exists } from '../functions.js';
 import { formatTime } from '../utils.js';
+import liveSamples from '../live-samples.js';
 
 export function remainingSeconds({intervals = [], index = 0, lapTime = 0, workoutStatus = 'stopped'} = {}) {
     if(!intervals.length || intervals.some((i) => !Number.isFinite(i?.duration))) return null;
@@ -68,3 +69,25 @@ class FinishTime extends HTMLElement {
 
 customElements.define('time-left', TimeLeft);
 customElements.define('finish-time', FinishTime);
+
+// Total kJ of the ride so far, in place of Slope (always 0.0 in ERG; rider,
+// Nov 13, 2026): the sum of each second's power (live-samples.js), so a
+// reloaded ride counts what was saved.
+
+export function totalKj(samples = []) {
+    return Math.round(samples.reduce((a, r) => a + (r.w || 0), 0) / 1000);
+}
+
+class WorkKj extends HTMLElement {
+    connectedCallback() {
+        this.abortController = new AbortController();
+        xf.sub('live:sample', (samples) => this.render(samples), {signal: this.abortController.signal});
+        this.render(liveSamples.all());
+    }
+    disconnectedCallback() { this.abortController.abort(); }
+    render(samples = []) {
+        this.textContent = samples.length ? String(totalKj(samples)) : '--';
+    }
+}
+
+customElements.define('work-kj', WorkKj);
