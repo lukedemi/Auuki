@@ -12,6 +12,7 @@ import './workout-graph.js';
 import './moxy-graph.js';
 import './live-chart.js';
 import './session-notice.js';
+import './time-left.js';
 import './watch.js';
 import './ant-device-scan.js';
 import './keyboard.js';

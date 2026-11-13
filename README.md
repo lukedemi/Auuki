@@ -25,6 +25,9 @@ node scripts/traces.mjs latest --kind event,error,mark --since 30m --follow
 - **L/R balance**: a two-sided meter (Assioma Duo pairs as one Bluetooth device, the left pedal speaking for both, so its power is already the total) sends the left's share with every power reading; it goes into the FIT as standard `left_right_balance` (the right's % with bit 7 set, as an Edge writes it), the power meter card's L/R tile, the live chart's window average (power-weighted, coasting left out) and the traces.
 - **Units**: imperial by default (a stored choice wins), the units on the Speed and Distance tiles, distance always in mi or km, and the virtual speed now uses the rider's weight (it stayed at an 85 kg default).
 
+- **Desktop layout**: on a landscape screen 1200 x 650 or larger, the numbers stack in a column on the left (Power and Target, Interval Time, HR and Cadence, Power Lap and Elapsed, Time Left and Finish), the live chart and the workout graph take the rest, the ERG target and Workout % sit under them, and the watch and menu share one bottom row. The rules are the last block in `src/css/flux.css`; smaller screens keep upstream's layouts.
+- **Time Left and Finish** replace Speed and Distance: what remains of the workout (the rest of this interval plus every one after it), and the clock time it will end, which slides later while paused (`src/views/time-left.js`).
+
 Deploy (from `master`, by hand — nothing deploys on merge):
 
 ```bash
