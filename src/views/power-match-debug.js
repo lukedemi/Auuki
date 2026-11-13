@@ -95,6 +95,7 @@ class PowerMatchDebug extends HTMLElement {
                 <button data-act="sim">sim</button>
                 <button data-act="csv">csv</button>
                 <button data-act="clear">clear</button>
+                <button data-act="mark" title="Put a mark in the debug trace">mark</button>
                 <button data-act="min">_</button>
             </div>
             <div class="pmd--body">
@@ -163,6 +164,7 @@ class PowerMatchDebug extends HTMLElement {
         }
         if(act === 'csv')   powerMatch.download();
         if(act === 'clear') powerMatch.clear();
+        if(act === 'mark')  { window.trace?.mark('marked from the power match panel'); e.target.textContent = 'marked'; setTimeout(() => e.target.textContent = 'mark', 1500); }
         if(act === 'min')   this.classList.toggle('min');
         this.render();
     }

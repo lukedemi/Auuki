@@ -201,6 +201,8 @@ function Connectable(args = {}) {
 
     let abortController;
     let signal;
+    let _attempt = 0;          // each connect() is one attempt; a stale one's failure is ignored
+    let _cancelWatch;          // set while watch() waits for an advertisement
 
     // end private state
 
@@ -311,6 +313,7 @@ function Connectable(args = {}) {
         abortController = new AbortController();
         signal = { signal: abortController.signal };
 
+        const attempt = ++_attempt;
         _status = Status.connecting;
         onConnecting();
 
@@ -341,11 +344,53 @@ function Connectable(args = {}) {
             onConnected();
 
         } catch(e) {
+            if(attempt !== _attempt) return;   // superseded (a cancelled watch)
             _connected = false;
             _status = Status.disconnected;
             onConnectFail(e);
             console.warn(e);
         }
+    }
+
+    // Stop waiting for a remembered device to advertise, so a tap on the
+    // switch can open the chooser instead (this fork, Nov 13, 2026).
+    function cancelWatch() {
+        if(!_cancelWatch) return false;
+        _cancelWatch();
+        _cancelWatch = undefined;
+        _attempt++;
+        _status = Status.disconnected;
+        return true;
+    }
+
+    // Reconnect a device this origin was allowed before, by its id, without
+    // the chooser: navigator.bluetooth.getDevices() finds it and
+    // watchAdvertisements() waits for it to wake up. Needs Chrome's
+    // persistent Web Bluetooth permissions; without them getDevices() returns
+    // nothing after a reload and this reports why.
+    //
+    // String -> {ok: Bool, reason: String}
+    async function reconnect(deviceId) {
+        if(!('bluetooth' in navigator) || typeof navigator.bluetooth.getDevices !== 'function') {
+            return {ok: false, reason: 'navigator.bluetooth.getDevices is not available in this browser'};
+        }
+        let devices = [];
+        try {
+            devices = await navigator.bluetooth.getDevices();
+        } catch(e) {
+            return {ok: false, reason: `getDevices failed: ${e?.message ?? e}`};
+        }
+        const device = devices.find((d) => d.id === deviceId);
+        if(!device) {
+            return {ok: false, reason: `not among the ${devices.length} device(s) this browser still allows`};
+        }
+        _device = device;
+        if(watchAdvertisementsSupported()) {
+            await connect({watching: true, requesting: false});
+        } else {
+            await connect({watching: false, requesting: false});
+        }
+        return isConnected() ? {ok: true, reason: 'connected'} : {ok: false, reason: 'did not answer'};
     }
 
     // request a device by using the configured filter
@@ -374,9 +419,15 @@ function Connectable(args = {}) {
         const timeout = 1 * 60 * 1000; // 60s
         const timeoutId = setTimeout(function() {
             print.log(`ble: watch: timeout:`);
+            _cancelWatch = undefined;
             abortController.abort();
-            reject();
+            reject(new Error('no advertisement within 60 s'));
         }, timeout);
+        _cancelWatch = () => {
+            clearTimeout(timeoutId);
+            abortController.abort();
+            reject(new Error('watch cancelled'));
+        };
 
         const abortController = new AbortController();
         device.addEventListener(
@@ -391,6 +442,7 @@ function Connectable(args = {}) {
         async function onAdvertisementReceived(e) {
             abortController.abort();
             clearTimeout(timeoutId);
+            _cancelWatch = undefined;
 
             print.log(`ble: watch: advertisement: received:`);
             resolve(e.device);
@@ -659,6 +711,8 @@ function Connectable(args = {}) {
     return {
         connect,
         disconnect,
+        reconnect,
+        cancelWatch,
         request,
         watch,
         hasService,

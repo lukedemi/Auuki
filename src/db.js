@@ -355,6 +355,16 @@ xf.reg('watch:stopped', (_, db) => {
 });
 xf.reg('activity:save:success', (e, db) => {
     models.session.reset(db);
+    models.session.clearSaved();
+});
+
+// the ride in progress, saved as it goes: every 15 s while recording, and
+// whenever the watch pauses or stops (models.js Session)
+xf.reg('watch:elapsed', (elapsed, db) => {
+    if(elapsed > 0 && elapsed % 15 === 0) models.session.backup(db);
+});
+xf.reg('watch:paused', (x, db) => {
+    models.session.backup(db);
 });
 xf.sub('ui:activity:upload:by:id', (id) => {
     models.activity.upload(id);
@@ -425,14 +435,16 @@ xf.reg('app:start', async function(_, db) {
 
     db.sources = models.sources.set(models.sources.restore());
 
-    // IndexedDB Schema Version 3
-    await idb.start('store', 3, ['session', 'workouts', 'activity']);
+    // IndexedDB Schema Version 4 (chunks: the ride in progress)
+    await idb.start('store', 4, ['session', 'workouts', 'activity', 'chunks']);
     db.workouts = await models.workouts.restore();
     db.activity = await models.activity.restore();
     db.workout = models.workout.restore(db);
     models.planned.restore();
 
     await models.session.restore(db);
+    // the live charts start again from what was saved (live-samples.js)
+    if((db.records ?? []).length) xf.dispatch('live:restore', db.records);
     xf.dispatch('workout:restore');
     xf.dispatch('activity:restore');
 

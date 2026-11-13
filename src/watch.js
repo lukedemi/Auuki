@@ -7,6 +7,9 @@ import { TimerStatus, EventType, } from './activity/enums.js';
 // const timer = new Worker('./timer.js');
 const timer = new Worker(new URL('./timer.js', import.meta.url));
 
+const AUTO_PAUSE_W = 20;   // under this is stopped
+const AUTO_PAUSE_S = 3;    // for this many seconds
+
 class Watch {
     constructor(args) {
         this.elapsed          = 0;
@@ -110,15 +113,19 @@ class Watch {
         this.autoPause = value.autoPause ?? this.autoPause;
         this.autoStart = value.autoStart ?? this.autoStart;
     }
+    // Auto-pause (this fork, Nov 13, 2026, rider: "way too slow or not
+    // working at all"): it waited for four 1 s readings of exactly 0 W, and a
+    // coasting trainer or pedal rarely reads exactly 0. Now: 3 s under 20 W.
+    // power1s itself drops to 0 once the sensors go quiet (models.js).
     onPower1s(power) {
         if(this.autoPause) {
-            if(power === 0 && this.isStarted()) {
+            if(power < AUTO_PAUSE_W && this.isStarted()) {
                 this.autoPauseCounter += 1;
             } else {
                 this.autoPauseCounter = 0;
             }
 
-            if(this.autoPauseCounter >= 4) {
+            if(this.autoPauseCounter >= AUTO_PAUSE_S) {
                 this.autoPauseCounter = 0;
                 xf.dispatch(`ui:watchPause`);
                 this.hasBeenAutoPaused = true;

@@ -25,7 +25,15 @@ function LiveSamples(args = {}) {
         xf.dispatch('live:sample', samples);
     }
 
+    // a reloaded ride: one record a second, in order (models.js Session)
+    function onRestore(records = []) {
+        if(samples.length) return;
+        samples = records.map((r, i) => ({ t: i + 1, w: r.power ?? 0, hr: r.heart_rate ?? 0, target: 0 }));
+        xf.dispatch('live:sample', samples);
+    }
+
     function start() {
+        xf.sub('live:restore',   onRestore);
         xf.sub('db:power1s',     (v) => latest.w = v);
         xf.sub('db:heartRate',   (v) => latest.hr = v);
         xf.sub('db:powerTarget', (v) => latest.target = v);
@@ -35,6 +43,7 @@ function LiveSamples(args = {}) {
     return Object.freeze({
         start,
         onElapsed,
+        onRestore,
         latest,
         all: () => samples,
         reset: () => { samples = []; xf.dispatch('live:sample', samples); },

@@ -919,11 +919,51 @@ class Planned {
     }
 }
 
+// The ride in progress, kept in IndexedDB so a reload or a crashed tab
+// does not lose it (this fork, Nov 13, 2026). Upstream wrote the whole
+// session, every record in it, only on beforeunload and when the wake lock
+// dropped, which a killed tab never reaches. Here the records go in
+// one-minute chunks (store 'chunks', id = chunk number) as the ride runs,
+// each full chunk written once; the session row (key 0) carries everything
+// else and the record count. db.js backs up every 15 s and on pause.
+const CHUNK = 60;
+
 function Session(args = {}) {
     let name = 'session';
+    let savedChunks = 0;   // full chunks already in IndexedDB
+    let busy = false;
 
-    function backup(db) {
-        idb.put('session', idb.setId(dbToSession(db), 0));
+    async function backup(db) {
+        if(busy) return;
+        busy = true;
+        try {
+            const session = dbToSession(db);
+            // db.records keeps growing while this awaits: take the length now
+            const records = (session.records ?? []).slice();
+            // a new ride: the chunks on disk belong to the last one
+            if(records.length < savedChunks * CHUNK) {
+                await idb.clear('chunks');
+                savedChunks = 0;
+            }
+            const full = Math.floor(records.length / CHUNK);
+            for(let i = savedChunks; i < full; i++) {
+                await idb.put('chunks', {id: i, records: records.slice(i * CHUNK, (i + 1) * CHUNK)});
+            }
+            savedChunks = full;
+            await idb.put('chunks', {id: full, records: records.slice(full * CHUNK)});
+
+            session.records = undefined;
+            session.chunked = true;
+            session.recordCount = records.length;
+            session.savedAt = Date.now();
+            await idb.put('session', idb.setId(session, 0));
+            xf.dispatch('session:backup', {records: records.length, elapsed: session.elapsed});
+        } catch(e) {
+            console.error(':session :backup :error', e);
+            xf.dispatch('session:backup:error', String(e?.message ?? e));
+        } finally {
+            busy = false;
+        }
     }
 
     async function restore(db) {
@@ -935,11 +975,30 @@ function Session(args = {}) {
 
         if(!empty(sessions)) {
             if(session.elapsed > 0) {
+                if(session.chunked) {
+                    const chunks = (await idb.getAll('chunks') ?? []).sort((a, b) => a.id - b.id);
+                    const records = chunks.flatMap((c) => c.records ?? []).slice(0, session.recordCount ?? Infinity);
+                    session.records = records;
+                    savedChunks = Math.floor(records.length / CHUNK);
+                }
+                delete session.chunked;
+                delete session.recordCount;
+                const savedAt = session.savedAt;
+                delete session.savedAt;
                 sessionToDb(db, session);
+                xf.dispatch('session:restored', {elapsed: session.elapsed, records: (session.records ?? []).length, savedAt});
             } else {
                 idb.clear(`${name}`);
+                idb.clear('chunks');
             }
         }
+    }
+
+    // the saved ride is gone once it is an activity
+    async function clearSaved() {
+        savedChunks = 0;
+        await idb.clear(`${name}`);
+        await idb.clear('chunks');
     }
 
     function sessionToDb(db, session) {
@@ -1131,6 +1190,7 @@ function Session(args = {}) {
         backup,
         restore,
         reset,
+        clearSaved,
         sessionToDb,
         dbToSession,
 
@@ -1317,6 +1377,8 @@ class PropInterval {
         this.prop        = existance(args.prop, this.getDefaults().prop);
         this.effect      = existance(args.effect, this.getDefaults().effect);
         this.interval    = existance(args.interval, this.getDefaults().interval);
+        this.zeroAfter   = existance(args.zeroAfter, 0);
+        this.silent      = 0;
         this.start();
     }
     getDefaults() {
@@ -1357,7 +1419,20 @@ class PropInterval {
         this.count += 1;
     }
     onInterval() {
-        if(equals(this.count, 0)) return;
+        if(equals(this.count, 0)) {
+            // A sensor that stops sending is not still at its last value
+            // (this fork, Nov 13, 2026): pedals and trainers often go
+            // quiet when the cranks stop, which held power on screen and in
+            // the file at the last reading, and kept auto-pause from firing.
+            // After `zeroAfter` silent intervals the value is 0, and stays
+            // a 0 a second (auto-pause counts seconds) until data returns.
+            if(this.zeroAfter > 0 && ++this.silent >= this.zeroAfter) {
+                this.state = 0;
+                xf.dispatch(`${this.effect}`, 0);
+            }
+            return;
+        }
+        this.silent = 0;
 
         this.state = this.accumulator / this.count;
         xf.dispatch(`${this.effect}`, this.state);
@@ -1650,7 +1725,7 @@ const dataTileSwitch = new DataTileSwitch({prop: 'dataTileSwitch', storage: Loca
 
 const virtualGear = new VirtualGear({prop: 'virtualGear'});
 
-const power1s = new PropInterval({prop: 'db:power', effect: 'power1s', interval: 1000});
+const power1s = new PropInterval({prop: 'db:power', effect: 'power1s', interval: 1000, zeroAfter: 2});
 const power3s = new PropInterval({prop: 'db:power', effect: 'power3s', interval: 3000});
 const powerInZone = new PowerInZone({ftpModel: ftp});
 

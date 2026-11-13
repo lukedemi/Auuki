@@ -323,3 +323,63 @@ describe('PowerMatch settling, wired', () => {
         expect(s.calm).toBeCloseTo(0.5, 5);
     });
 });
+
+describe('easing back in after a pause', () => {
+    let pm, clock, sent, abort;
+
+    beforeEach(() => {
+        jest.useFakeTimers();
+        clock = 0;
+        sent = [];
+        abort = new AbortController();
+        pm = PowerMatch({now: () => clock});
+        pm.start();
+        xf.sub('trainer:powerTarget', v => sent.push(v), {signal: abort.signal});
+    });
+
+    afterEach(() => { pm.stop(); abort.abort(); jest.useRealTimers(); });
+
+    const status = (s) => xf.dispatch('db:watchStatus', {watchStatus: s});
+    function run(seconds) {
+        for(let i = 0; i < seconds; i++) { clock += 1000; jest.advanceTimersByTime(1000); }
+    }
+
+    test('paused, the trainer holds 100 W; resumed, it ramps to the target over 20 s', () => {
+        status('started');
+        run(25);
+        xf.dispatch('db:powerTarget', {powerTarget: 286});
+        expect(pm.trainerTarget()).toBe(286);
+
+        status('paused');
+        expect(sent[sent.length - 1]).toBe(100);
+        expect(pm.isEasing()).toBe(true);
+
+        sent.length = 0;
+        status('started');
+        expect(sent[0]).toBe(100);
+        run(10);
+        const mid = sent[sent.length - 1];
+        expect(mid).toBeGreaterThan(180);
+        expect(mid).toBeLessThan(205);       // halfway: 100 + 186 / 2 = 193
+        run(12);
+        expect(sent[sent.length - 1]).toBe(286);
+        expect(pm.isEasing()).toBe(false);
+    });
+
+    test('an easy target is never raised to the floor', () => {
+        status('started');
+        run(25);
+        xf.dispatch('db:powerTarget', {powerTarget: 80});
+        status('paused');
+        expect(sent[sent.length - 1]).toBe(80);
+    });
+
+    test('a ride starting from stopped also ramps in', () => {
+        xf.dispatch('db:powerTarget', {powerTarget: 250});
+        sent.length = 0;
+        status('started');
+        expect(sent[0]).toBe(100);
+        run(21);
+        expect(sent[sent.length - 1]).toBe(250);
+    });
+});

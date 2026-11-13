@@ -4,6 +4,17 @@ import Connectable from './connectable.js';
 import { webBle } from './web-ble.js';
 import { Device, Status, ControlMode, } from './enums.js';
 
+const REMEMBER_KEY = 'ble:remembered';
+
+function remembered() {
+    try { return JSON.parse(localStorage.getItem(REMEMBER_KEY) ?? '{}') ?? {}; } catch(e) { return {}; }
+}
+
+// Settings > Reconnect Devices, on by default (stored with the other sources)
+function reconnectOnLoad() {
+    try { return (JSON.parse(localStorage.getItem('sources') ?? '{}') ?? {}).reconnectDevices ?? true; } catch(e) { return true; }
+}
+
 function ReactiveConnectable(args = {}) {
     // config
     const deviceType = args.deviceType ?? Device.generic;
@@ -38,7 +49,34 @@ function ReactiveConnectable(args = {}) {
     function onConnected() {
         xf.dispatch(`${getIdentifier()}:connected`);
         xf.dispatch(`${getIdentifier()}:name`, connectable.getName());
+        remember();
     }
+
+    // Remembered devices (this fork, Nov 13, 2026): the last device of this
+    // type that connected, by its Web Bluetooth id, reconnected on load
+    // without the chooser when Settings > Reconnect Devices is on.
+    function remember() {
+        const id = connectable.getId();
+        if(!id) return;
+        const all = remembered();
+        all[identifier] = {id, name: connectable.getName(), at: Date.now()};
+        try { localStorage.setItem(REMEMBER_KEY, JSON.stringify(all)); } catch(e) {}
+    }
+
+    async function reconnectRemembered() {
+        const device = remembered()[identifier];
+        if(!device || connectable.isConnected()) return;
+        for(let tries = 1; tries <= 3; tries++) {
+            if(connectable.isConnected() || cancelled) return;
+            xf.dispatch('ble:reconnect', {identifier, name: device.name, try: tries, state: 'watching'});
+            const res = await connectable.reconnect(device.id);
+            xf.dispatch('ble:reconnect', {identifier, name: device.name, try: tries, state: res.ok ? 'connected' : 'failed', reason: res.reason});
+            if(res.ok || cancelled) return;
+            // nothing to wait for if the browser no longer knows the device
+            if(!/did not answer|advertisement/.test(res.reason)) return;
+        }
+    }
+    let cancelled = false;
 
     function onDisconnect() {
         xf.dispatch(`${getIdentifier()}:disconnected`);
@@ -129,6 +167,9 @@ function ReactiveConnectable(args = {}) {
         if(connectable.isConnected()) {
             connectable.disconnect();
         } else {
+            // a tap while a remembered device is being waited for: stop
+            // waiting and open the chooser
+            if(connectable.cancelWatch()) cancelled = true;
             connectable.connect({requesting: true});
         }
     }
@@ -171,6 +212,10 @@ function ReactiveConnectable(args = {}) {
         abortController = new AbortController();
         signal = { signal: abortController.signal };
 
+        if(reconnectOnLoad() && remembered()[identifier]) {
+            setTimeout(reconnectRemembered, 500);
+        }
+
         xf.sub(`ui:${getIdentifier()}:switch`, onSwitch, signal);
 
         if(equals(deviceType, Device.controllable)) {
@@ -199,4 +244,5 @@ function ReactiveConnectable(args = {}) {
 }
 
 export default ReactiveConnectable;
+export { remembered, REMEMBER_KEY };
 

@@ -1752,6 +1752,39 @@ class PowerMatchDebugSetting extends AutoPause {
 
 customElements.define('power-match-debug-setting', PowerMatchDebugSetting);
 
+// Settings > Reconnect Devices: the last trainer, power meter, HRM … that
+// connected come back on load without the chooser (reactive-connectable.js)
+class ReconnectDevicesSetting extends AutoPause {
+    postInit() {
+        this.effect  = 'sources';
+        this.key     = 'reconnectDevices';
+        this.state   = true;
+        this.values  = {on: {reconnectDevices: true}, off: {reconnectDevices: false}};
+    }
+    onUpdate(value) {
+        this.state = value[this.key] ?? true;
+        this.render();
+    }
+}
+
+customElements.define('reconnect-devices-setting', ReconnectDevicesSetting);
+
+// Settings > Send Debug Traces (trace.js)
+class TracesSetting extends AutoPause {
+    postInit() {
+        this.effect  = 'sources';
+        this.key     = 'traces';
+        this.state   = true;
+        this.values  = {on: {traces: true}, off: {traces: false}};
+    }
+    onUpdate(value) {
+        this.state = value[this.key] ?? true;
+        this.render();
+    }
+}
+
+customElements.define('traces-setting', TracesSetting);
+
 // The power meter card's Match tile: how far the meter reads from the
 // trainer, e.g. -3.1% = the pedals read 3.1% below the trainer, so the
 // trainer is being asked for 3.2% more than the target
