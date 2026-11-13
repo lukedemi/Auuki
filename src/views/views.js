@@ -11,6 +11,7 @@ import './activity-list.js';
 import './workout-graph.js';
 import './moxy-graph.js';
 import './live-chart.js';
+import './room-status.js';
 import './session-notice.js';
 import './time-left.js';
 import './fit-text.js';

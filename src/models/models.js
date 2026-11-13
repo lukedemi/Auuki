@@ -15,6 +15,7 @@ import { fileHandler } from '../file.js';
 import { Model as Cycling } from '../physics.js';
 import { fit } from '../fit/fit.js';
 import liveSamples from '../live-samples.js';
+import room from '../room.js';
 
 import { Device, Status, ControlMode, } from '../ble/enums.js';
 import { TimerStatus, EventType, } from '../activity/enums.js';
@@ -679,6 +680,8 @@ class Activity extends Model {
                 w:      samples.map((r) => Math.round(r.w || 0)),
                 hr:     samples.map((r) => Math.round(r.hr || 0)),
                 target: samples.map((r) => Math.round(r.target || 0)),
+                // the trainer room once a minute, from Home Assistant (room.js), when it was reachable
+                room: room.log(),
             };
         } catch(e) {
             return null;

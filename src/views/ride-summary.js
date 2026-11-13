@@ -17,6 +17,7 @@
 import { xf } from '../functions.js';
 import { models } from '../models/models.js';
 import direct from '../models/intervals-direct.js';
+import { roomSummary } from '../room.js';
 import { recordChart, cardModel, cardSvg, svgToPng, fileName as pngName, downloadBlob } from '../ride-card.js';
 
 const FEEL = [[1, 'Very strong'], [2, 'Strong'], [3, 'Normal'], [4, 'Meh'], [5, 'Weak']];
@@ -47,6 +48,7 @@ ride-summary input.rs--name:hover, ride-summary input.rs--name:focus { border-co
 ride-summary .rs--stats { display: flex; flex-wrap: wrap; gap: 6px 34px; margin: 4px 10px 16px; }
 ride-summary .rs--stat b { display: block; line-height: 1.15; font-size: 27px; font-variant-numeric: tabular-nums; }
 ride-summary .rs--stat span { display: block; line-height: 1.3; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.6; }
+ride-summary .rs--room { margin: -8px 10px 16px; font-size: 15px; opacity: 0.75; font-variant-numeric: tabular-nums; }
 ride-summary .rs--grid { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(300px, 1fr); gap: 26px; align-items: start; }
 @media (max-width: 900px) { ride-summary .rs--grid { grid-template-columns: 1fr; } }
 ride-summary .rs--img {
@@ -83,6 +85,20 @@ ride-summary .rs--files { margin-top: 10px; }
 `;
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+
+// "Room 62.4 → 65.1°F · 50 → 55% · CO₂ 660 → 1,120 ppm (max 1,180) · fans: front 48 min"
+export function roomLine(r) {
+    if(!r) return '';
+    const fmt = (n, d = 0) => n.toLocaleString('en-US', {minimumFractionDigits: d, maximumFractionDigits: d});
+    const span = (x, d, unit) => x.from === x.to ? `${fmt(x.from, d)}${unit}` : `${fmt(x.from, d)} → ${fmt(x.to, d)}${unit}`;
+    const parts = [];
+    if(r.temp) parts.push(span(r.temp, 1, '°F'));
+    if(r.hum) parts.push(span(r.hum, 0, '%'));
+    if(r.co2) parts.push(`CO₂ ${span(r.co2, 0, ' ppm')}${r.co2.max > Math.max(r.co2.from, r.co2.to) ? ` (max ${fmt(r.co2.max)})` : ''}`);
+    const fans = [r.front && `front ${r.front} min`, r.rear && `rear ${r.rear} min`].filter(Boolean);
+    parts.push(fans.length ? `fans: ${fans.join(', ')}` : 'fans off');
+    return parts.length ? `Room  ${parts.join(' · ')}` : '';
+}
 
 let loadedWorkout = null;
 xf.sub('db:workout', (w) => loadedWorkout = w);
@@ -160,6 +176,7 @@ class RideSummary extends HTMLElement {
             </div>
             <input class="rs--name" type="text" maxlength="120" aria-label="Ride name" placeholder="Name this ride">
             <div class="rs--stats"></div>
+            <div class="rs--room"></div>
             <div class="rs--grid">
                 <div>
                     <img class="rs--img" alt="The ride, drawn for Strava">
@@ -230,6 +247,8 @@ class RideSummary extends HTMLElement {
         const avg = Math.round(this.chart.w.reduce((a, b) => a + b, 0) / this.chart.w.length);
         const stats = [m.stats[0], [`${avg} W`, 'avg power'], ...m.stats.slice(1)];
         $s.innerHTML = stats.map(([v, l]) => `<div class="rs--stat"><b>${esc(v)}</b><span>${esc(l)}</span></div>`).join('');
+        const $room = this.querySelector('.rs--room');
+        if($room) $room.textContent = roomLine(roomSummary(this.chart.room ?? []));
     }
 
     renderImage() {
