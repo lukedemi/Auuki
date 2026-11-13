@@ -3,7 +3,7 @@
  */
 
 import { fit } from '../src/fit/fit.js';
-import { cleanTitle, cardModel, cardSvg, chartFromFit, fileName } from '../src/ride-card.js';
+import { cleanTitle, cardModel, cardSvg, chartFromFit, fileName, funLines } from '../src/ride-card.js';
 
 // 10 min at 150, then 3 x (4 min at 260, 2 min at 150), 5 min at 120; FTP 250
 function ride() {
@@ -60,13 +60,12 @@ describe('ride card', () => {
         expect(cardSvg(m)).toMatch(/^<svg[\s\S]*<\/svg>$/);
     });
 
-    test('the svg is well-formed XML, and carries the app, not the ride\'s title', () => {
+    test('the svg is well-formed XML, and carries no title', () => {
         const svg = cardSvg(cardModel(ride(), {name: 'Tom & Jerry <3'}));
         const doc = new DOMParser().parseFromString(svg, 'image/svg+xml');
         expect(doc.getElementsByTagName('parsererror').length).toBe(0);
         expect(svg).not.toContain('Tom');
-        expect(svg).toContain('Auuki<tspan');
-        expect(svg).toContain('(lukedemi fork)');
+        expect(svg).not.toContain('Auuki');
         expect(svg).toContain('rep 2 · 160 bpm');
         expect(svg).toContain('>plan<');
         expect(svg).not.toContain('target set');
@@ -124,5 +123,28 @@ describe('ride card', () => {
 
     test('file name is the ride date', () => {
         expect(fileName(new Date(2026, 10, 13, 12).getTime())).toBe('ride-2026-11-13.png');
+    });
+
+    test('the extra lines: only what the ride carries', () => {
+        const c = ride();
+        expect(funLines(c)).toEqual([]);
+        c.cad = c.w.map(() => 90);
+        c.bal = c.w.map((w, i) => (i < 600 ? 46 : 50));
+        c.room = [
+            {t: 0, temp: 62.4, hum: 50, co2: 660, front: 0, rear: 0},
+            {t: 1200, temp: 64.0, hum: 53, co2: 1180, front: 1, rear: 0},
+            {t: 1980, temp: 65.1, hum: 55, co2: 1120, front: 1, rear: 0},
+        ];
+        c.extended = [{iv: 7, added: 600, last: true}, {iv: 2, added: 300, last: false}];
+        expect(funLines(c)).toEqual([
+            'Room 62.4 → 65.1°F · 50 → 55% · CO₂ 660 → 1,120 ppm (max 1,180) · fans: front 13 min',
+            '90 rpm · L/R 49/51 · cool-down +10 min · interval 3 +5 min',
+        ]);
+        // fans that never ran are not worth a mention on the image
+        c.room.forEach((r) => r.front = 0);
+        expect(funLines(c)[0]).toBe('Room 62.4 → 65.1°F · 50 → 55% · CO₂ 660 → 1,120 ppm (max 1,180)');
+        const svg = cardSvg(cardModel(c));
+        expect(svg).toContain('90 rpm · L/R 49/51');
+        expect(svg).toContain('CO₂ 660 → 1,120 ppm');
     });
 });

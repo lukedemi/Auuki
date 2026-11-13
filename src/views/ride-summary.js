@@ -18,7 +18,7 @@ import { xf } from '../functions.js';
 import { models } from '../models/models.js';
 import direct from '../models/intervals-direct.js';
 import { roomSummary } from '../room.js';
-import { recordChart, cleanTitle, cardModel, cardSvg, svgToPng, fileName as pngName, downloadBlob } from '../ride-card.js';
+import { recordChart, cleanTitle, roomLine, cardModel, cardSvg, svgToPng, fileName as pngName, downloadBlob } from '../ride-card.js';
 
 const FEEL = [[1, 'Very strong'], [2, 'Strong'], [3, 'Normal'], [4, 'Meh'], [5, 'Weak']];
 const RPE_WORDS = {1: 'very easy', 3: 'easy', 5: 'moderate', 7: 'hard', 9: 'very hard', 10: 'max'};
@@ -86,19 +86,7 @@ ride-summary .rs--files { margin-top: 10px; }
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
 
-// "Room 62.4 → 65.1°F · 50 → 55% · CO₂ 660 → 1,120 ppm (max 1,180) · fans: front 48 min"
-export function roomLine(r) {
-    if(!r) return '';
-    const fmt = (n, d = 0) => n.toLocaleString('en-US', {minimumFractionDigits: d, maximumFractionDigits: d});
-    const span = (x, d, unit) => x.from === x.to ? `${fmt(x.from, d)}${unit}` : `${fmt(x.from, d)} → ${fmt(x.to, d)}${unit}`;
-    const parts = [];
-    if(r.temp) parts.push(span(r.temp, 1, '°F'));
-    if(r.hum) parts.push(span(r.hum, 0, '%'));
-    if(r.co2) parts.push(`CO₂ ${span(r.co2, 0, ' ppm')}${r.co2.max > Math.max(r.co2.from, r.co2.to) ? ` (max ${fmt(r.co2.max)})` : ''}`);
-    const fans = [r.front && `front ${r.front} min`, r.rear && `rear ${r.rear} min`].filter(Boolean);
-    parts.push(fans.length ? `fans: ${fans.join(', ')}` : 'fans off');
-    return parts.length ? `Room  ${parts.join(' · ')}` : '';
-}
+export { roomLine };
 
 let loadedWorkout = null;
 xf.sub('db:workout', (w) => loadedWorkout = w);

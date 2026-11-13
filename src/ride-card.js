@@ -20,9 +20,9 @@
 
 import { fit } from './fit/fit.js';
 import { normalizedPower } from './views/time-left.js';
+import { roomSummary } from './room.js';
 
 const W = 1600, H = 1000;
-export const BRAND = 'Auuki', BRAND_SUB = '(lukedemi fork)';
 const L = 70, R = 40, T = 215, B = 950;
 const PW = W - L - R, PH = B - T;
 
@@ -197,7 +197,53 @@ export function cardModel(chart, {name = ''} = {}) {
         [hrs.length ? String(Math.round(mean(hrs))) : '—', 'avg bpm'],
     ];
 
-    return {v: 1, title: cleanTitle(name) || 'Ride', ftp: ftp || 300, end, step, pts, blocks, set, free: [], labels, stats};
+    return {v: 1, title: cleanTitle(name) || 'Ride', ftp: ftp || 300, end, step, pts, blocks, set, free: [], labels, stats, lines: funLines(chart)};
+}
+
+// ---------------------------------------------------------------- the extras
+
+const fmtN = (n, d = 0) => n.toLocaleString('en-US', {minimumFractionDigits: d, maximumFractionDigits: d});
+
+// "Room 62.4 → 65.1°F · 50 → 55% · CO₂ 660 → 1,120 ppm (max 1,180) · fans: front 48 min"
+// (fansOff: say "fans off" when they were; the image leaves it out)
+export function roomLine(r, {fansOff = true} = {}) {
+    if(!r) return '';
+    const span = (x, d, unit) => x.from === x.to ? `${fmtN(x.from, d)}${unit}` : `${fmtN(x.from, d)} → ${fmtN(x.to, d)}${unit}`;
+    const parts = [];
+    if(r.temp) parts.push(span(r.temp, 1, '°F'));
+    if(r.hum) parts.push(span(r.hum, 0, '%'));
+    if(r.co2) parts.push(`CO₂ ${span(r.co2, 0, ' ppm')}${r.co2.max > Math.max(r.co2.from, r.co2.to) ? ` (max ${fmtN(r.co2.max)})` : ''}`);
+    const fans = [r.front && `front ${r.front} min`, r.rear && `rear ${r.rear} min`].filter(Boolean);
+    if(fans.length) parts.push(`fans: ${fans.join(', ')}`);
+    else if(fansOff) parts.push('fans off');
+    return parts.length ? `Room  ${parts.join(' · ')}` : '';
+}
+
+// The lines under the numbers (rider, Nov 13, 2026: "make sure other fun
+// things are on there as lines if they would be interesting"): each only
+// when the ride carries it.
+export function funLines(chart = {}) {
+    const lines = [];
+    const room = roomLine(roomSummary(chart.room ?? []), {fansOff: false});
+    if(room) lines.push(room.replace(/^Room {2}/, 'Room '));
+
+    const parts = [];
+    const cads = (chart.cad ?? []).filter((c) => c > 0);
+    if(cads.length >= 60) parts.push(`${Math.round(cads.reduce((a, b) => a + b, 0) / cads.length)} rpm`);
+    // left/right, weighted by power, pedalling only
+    let wsum = 0, lsum = 0;
+    (chart.bal ?? []).forEach((b, i) => {
+        const w = chart.w?.[i] ?? 0;
+        if(b === null || b === undefined || !(w > 0)) return;
+        wsum += w; lsum += b * w;
+    });
+    if(wsum > 0) { const l = Math.round(lsum / wsum); parts.push(`L/R ${l}/${100 - l}`); }
+    for(const e of chart.extended ?? []) {
+        const min = Math.round((e.added || 0) / 60);
+        if(min > 0) parts.push(`${e.last ? 'cool-down' : `interval ${e.iv + 1}`} +${min} min`);
+    }
+    if(parts.length) lines.push(parts.join(' · '));
+    return lines;
 }
 
 // ---------------------------------------------------------------- the picture
@@ -218,12 +264,14 @@ export function cardSvg(m) {
     out.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif">`);
     out.push(`<rect width="${W}" height="${H}" fill="#14161b"/>`);
 
-    // the app, where the ride's title was (rider, Nov 13, 2026: "Instead of the title have it say Auuki (lukedemi fork)")
-    out.push(`<text x="${L}" y="92" fill="#fff" font-size="46" font-weight="700">${escXml(BRAND)}<tspan fill="#7d8390" font-weight="500" font-size="32"> ${escXml(BRAND_SUB)}</tspan></text>`);
+    // no title (rider, Nov 13, 2026): the numbers at the top, the extras under them
     m.stats.forEach(([v, lab], k) => {
         const sx = L + k * 245;
-        out.push(`<text x="${sx}" y="162" fill="#fff" font-size="38" font-weight="700">${escXml(v)}</text>`);
-        out.push(`<text x="${sx}" y="188" fill="#7d8390" font-size="20" letter-spacing="1">${escXml(lab.toUpperCase())}</text>`);
+        out.push(`<text x="${sx}" y="88" fill="#fff" font-size="44" font-weight="700">${escXml(v)}</text>`);
+        out.push(`<text x="${sx}" y="116" fill="#7d8390" font-size="20" letter-spacing="1">${escXml(lab.toUpperCase())}</text>`);
+    });
+    (m.lines ?? []).slice(0, 2).forEach((line, k) => {
+        out.push(`<text x="${L}" y="${158 + k * 32}" fill="#c4c8d0" font-size="24">${escXml(line)}</text>`);
     });
 
     for(const pct of [55, 75, 90, 105, 120, 150]) {

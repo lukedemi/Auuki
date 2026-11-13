@@ -18,8 +18,8 @@ describe('LiveSamples', () => {
         xf.dispatch('db:power1s', {power1s: 255});
         xf.dispatch('watch:elapsed', 2);
         expect(ls.all()).toEqual([
-            {t: 1, w: 250, hr: 140, target: 260, bal: null, iv: -1, st: -1},
-            {t: 2, w: 255, hr: 140, target: 260, bal: null, iv: -1, st: -1},
+            {t: 1, w: 250, hr: 140, cad: 0, target: 260, bal: null, iv: -1, st: -1},
+            {t: 2, w: 255, hr: 140, cad: 0, target: 260, bal: null, iv: -1, st: -1},
         ]);
     });
 
@@ -63,5 +63,19 @@ describe('live chart arithmetic', () => {
     test('window balance is weighted by power and leaves out coasting', () => {
         const rows = [{w: 300, hr: 150, bal: 48}, {w: 100, hr: 150, bal: 52}, {w: 0, hr: 150, bal: 80}];
         expect(windowStats(rows).bal).toBe(49);   // (48 x 300 + 52 x 100) / 400
+    });
+});
+
+describe('LiveSamples, the extras', () => {
+    test('cadence each second, and +5 min presses, which a new ride clears', () => {
+        const ls = LiveSamples();
+        ls.start();
+        xf.dispatch('db:cadence', {cadence: 91});
+        ls.onElapsed(1); ls.onElapsed(2);
+        xf.dispatch('interval:extended', {interval: 4, added: 300});
+        expect(ls.all().map((r) => r.cad)).toEqual([91, 91]);
+        expect(ls.extensions()).toEqual([{iv: 4, added: 300, t: 2}]);
+        ls.onElapsed(1);
+        expect(ls.extensions()).toEqual([]);
     });
 });
