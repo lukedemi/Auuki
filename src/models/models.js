@@ -14,6 +14,7 @@ import { zwo } from '../workouts/zwo.js';
 import { fileHandler } from '../file.js';
 import { Model as Cycling } from '../physics.js';
 import { fit } from '../fit/fit.js';
+import liveSamples from '../live-samples.js';
 
 import { Device, Status, ControlMode, } from '../ble/enums.js';
 import { TimerStatus, EventType, } from '../activity/enums.js';
@@ -614,11 +615,31 @@ class Activity extends Model {
             id,
             blob,
             summary,
+            chart: this.chart(db),
         };
 
         this.add(summary, db.activity);
         idb.put('activity', record);
         xf.dispatch('activity:add', summary);
+    }
+    // The ride a second at a time, for the image button (ride-card.js): the
+    // target is the one actually set, intensity and extensions included.
+    chart(db) {
+        try {
+            const samples = liveSamples.all();
+            return {
+                v: 1, ftp: db.ftp ?? 0,
+                t:      samples.map((r) => r.t),
+                w:      samples.map((r) => Math.round(r.w || 0)),
+                hr:     samples.map((r) => Math.round(r.hr || 0)),
+                target: samples.map((r) => Math.round(r.target || 0)),
+            };
+        } catch(e) {
+            return null;
+        }
+    }
+    async get(id) {
+        return await idb.get('activity', id);
     }
     add(activity, activityList) {
         activityList.unshift(activity);
