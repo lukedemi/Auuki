@@ -23,3 +23,12 @@ describe('time left', () => {
         expect(clockAt(Date.UTC(2026, 10, 13, 22, 10))).toMatch(/^\d{1,2}:10 (AM|PM)$/);
     });
 });
+
+import { totalKj } from '../src/views/time-left.js';
+
+describe('total kJ', () => {
+    test('one sample a second: watts summed over seconds, in kJ', () => {
+        expect(totalKj(Array.from({length: 3600}, () => ({w: 250})))).toBe(900);
+        expect(totalKj([])).toBe(0);
+    });
+});

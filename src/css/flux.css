@@ -3764,7 +3764,7 @@ and (orientation: landscape) {
     .data-tiles {
         grid-area: 2 / 1 / 5 / 2;
         grid-template-columns: 1fr 1fr;
-        grid-template-rows: 1.5fr 1.15fr 1fr 1fr 1fr;
+        grid-template-rows: 1.5fr 1.2fr 1.2fr 1fr 1fr;
         font-size: clamp(1.1rem, 1.25vw, 1.9rem);
         --data-tile--value-font-size: 3.4em;
         --data-tile-small--value-font-size: 2.1em;
@@ -3781,18 +3781,20 @@ and (orientation: landscape) {
         text-align: center;
     }
 
+    /* rider, Nov 13, 2026: heart rate beside the power, the clocks
+       together, kJ in place of slope */
     #data-tile--power         { grid-area: 1 / 1 / 2 / 2; }
     #data-tile--target        { grid-area: 1 / 2 / 2 / 3; }
-    #data-tile--interval-time { grid-area: 2 / 1 / 3 / 3; }
-    #data-tile--heart-rate    { grid-area: 3 / 1 / 4 / 2; }
-    #data-tile--cadence       { grid-area: 3 / 2 / 4 / 3; }
-    #data-tile--power-avg     { grid-area: 4 / 1 / 5 / 2; display: block; }
-    #data-tile--elapsed-time  { grid-area: 4 / 2 / 5 / 3; }
-    #data-tile--speed         { grid-area: 5 / 1 / 6 / 2; display: block; }
-    #data-tile--distance      { grid-area: 5 / 2 / 6 / 3; display: block; }
+    #data-tile--heart-rate    { grid-area: 2 / 1 / 3 / 2; }
+    #data-tile--cadence       { grid-area: 2 / 2 / 3 / 3; }
+    #data-tile--interval-time { grid-area: 3 / 1 / 4 / 2; }
+    #data-tile--speed         { grid-area: 3 / 2 / 4 / 3; display: block; }   /* Time Left */
+    #data-tile--power-avg     { grid-area: 4 / 1 / 5 / 2; display: block; }   /* Power Lap */
+    #data-tile--slope         { grid-area: 4 / 2 / 5 / 3; display: block; }   /* kJ */
+    #data-tile--elapsed-time  { grid-area: 5 / 1 / 6 / 2; }
+    #data-tile--distance      { grid-area: 5 / 2 / 6 / 3; display: block; }   /* Finish */
 
-    /* the second-row tiles and sensors this rider does not use */
-    #data-tile--slope,
+    /* the second tile page and sensors this rider does not use */
     #data-tile--smo2,
     #data-tile--thb,
     #data-tile--core-body-temperature,
@@ -3803,12 +3805,17 @@ and (orientation: landscape) {
 
     /* the slightly smaller tiles still read at a glance */
     #data-tile--heart-rate .data-tile--value,
-    #data-tile--cadence .data-tile--value,
-    #data-tile--elapsed-time .data-tile--value {
-        font-size: 2.6em;
+    #data-tile--cadence .data-tile--value {
+        font-size: 3em;
     }
     #data-tile--interval-time .data-tile--value {
-        font-size: 3.8em;
+        font-size: 2.8em;
+    }
+    #data-tile--elapsed-time .data-tile--value {
+        font-size: 2.1em;
+    }
+    #data-tile--speed .data-tile-small--value {
+        font-size: 2.6em;
     }
     .data-tile-small--value {
         font-size: 2.2em;

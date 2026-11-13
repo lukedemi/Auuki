@@ -2,7 +2,10 @@
  * @jest-environment jsdom
  */
 import { xf } from '../src/functions.js';
-import { PowerMatchCore, PowerMatch, settle, shouldCorrect } from '../src/power-match.js';
+import appPowerMatch, { PowerMatchCore, PowerMatch, settle, shouldCorrect } from '../src/power-match.js';
+
+// the app's own instance listens to the same events; only the tests' own speak here
+appPowerMatch.stop();
 
 // feed paired 1 Hz samples: trainer and meter each second
 function ride(core, {seconds, trainer, meter, t0 = 0}) {
@@ -171,7 +174,7 @@ describe('PowerMatch wiring', () => {
         expect(log.some(r => r.event === 'target')).toBe(true);
 
         const lines = pm.csv().trim().split('\n');
-        expect(lines[0]).toBe('t,time,event,enabled,sim,ready,paired,ratio,target,sent,trainer,meter,emaTrainer,emaMeter,source,steady,calm');
+        expect(lines[0]).toBe('t,time,event,enabled,sim,ready,paired,ratio,target,sent,trainer,meter,emaTrainer,emaMeter,source,steady,calm,hold');
         expect(lines.length).toBe(log.length + 1);
 
         pm.clear();
@@ -381,5 +384,75 @@ describe('easing back in after a pause', () => {
         expect(sent[0]).toBe(100);
         run(21);
         expect(sent[sent.length - 1]).toBe(250);
+    });
+});
+
+describe('a new interval: the calibration holds, a step up ramps in', () => {
+    let pm, clock, sent, abort;
+
+    beforeEach(() => {
+        jest.useFakeTimers();
+        clock = 0;
+        sent = [];
+        abort = new AbortController();
+        pm = PowerMatch({now: () => clock});
+        pm.start();
+        xf.sub('trainer:powerTarget', v => sent.push(v), {signal: abort.signal});
+    });
+
+    afterEach(() => { pm.stop(); abort.abort(); jest.useRealTimers(); });
+
+    function ride(seconds, trainer, meter) {
+        for(let i = 0; i < seconds; i++) {
+            clock += 1000;
+            jest.advanceTimersByTime(1000);
+            xf.dispatch('ble:controllable:power', typeof trainer === 'function' ? trainer() : trainer);
+            xf.dispatch('ble:powerMeter:power', typeof meter === 'function' ? meter() : meter);
+        }
+    }
+
+    test('the spin-up mismatch after a step teaches nothing, and the step up arrives over 5 s', () => {
+        xf.dispatch('db:sources', {sources: {power: 'ble:powerMeter'}});
+        xf.dispatch('db:watchStatus', {watchStatus: 'started'});
+        xf.dispatch('db:powerTarget', {powerTarget: 200});
+        ride(120, 208, 200);                         // pedals 4% under the trainer
+        const ratio = pm.core.ratio();
+        expect(ratio).toBeCloseTo(0.9615, 3);
+
+        const before = sent[sent.length - 1];
+        const goal = pm.core.adjust(300);
+        sent.length = 0;
+        xf.dispatch('db:powerTarget', {powerTarget: 300});
+        expect(sent[0]).toBe(before);                // starts from where the trainer was
+        // the first 12 s: the rider spinning up, the pedals 25% under the trainer
+        ride(12, 312, 234);
+        expect(pm.core.ratio()).toBeCloseTo(ratio, 6);   // held
+        expect(pm.snapshot().hold).toBe(true);
+        const up = sent.slice(0, 6);
+        up.slice(1).forEach((v, i) => expect(v).toBeGreaterThan(up[i]));   // rising every second
+        expect(up[5]).toBe(goal);                    // at 300 / ratio after 5 s
+        expect(Math.max(...sent)).toBe(goal);        // and no correction chased the mismatch
+        ride(10, 312, 300);
+        expect(pm.snapshot().hold).toBe(false);
+    });
+
+    test('a step down lands at once, still with the hold', () => {
+        xf.dispatch('db:sources', {sources: {power: 'ble:powerMeter'}});
+        xf.dispatch('db:watchStatus', {watchStatus: 'started'});
+        xf.dispatch('db:powerTarget', {powerTarget: 300});
+        ride(120, 300, 300);
+        sent.length = 0;
+        xf.dispatch('db:powerTarget', {powerTarget: 150});
+        expect(sent[0]).toBe(150);
+        expect(pm.snapshot().hold).toBe(true);
+    });
+
+    test('a small change (a ramp step or a +5) does not hold', () => {
+        xf.dispatch('db:sources', {sources: {power: 'ble:powerMeter'}});
+        xf.dispatch('db:watchStatus', {watchStatus: 'started'});
+        xf.dispatch('db:powerTarget', {powerTarget: 250});
+        ride(60, 250, 250);
+        xf.dispatch('db:powerTarget', {powerTarget: 255});
+        expect(pm.snapshot().hold).toBe(false);
     });
 });
