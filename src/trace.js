@@ -124,6 +124,7 @@ function Trace(args = {}) {
         xf.sub('ble:reconnect', (r) => event('ble:reconnect', r));
         xf.sub('db:intensity', (v) => { if(v !== st.intensity) event('intensity', {from: st.intensity, to: v}); st.intensity = v; });
         xf.sub('sound:beep', (r) => event('beep', r));
+        xf.sub('interval:extended', (r) => event('interval:extended', r));
         xf.sub('powerMatch:debug', (r) => {
             if(r && r.event) event('powerMatch', {what: r.event, target: r.target, sent: r.sent, ratio: r.ratio,
                 trainer: r.trainer, meter: r.meter, steady: r.steady, calm: r.calm});

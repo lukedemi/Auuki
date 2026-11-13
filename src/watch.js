@@ -3,6 +3,7 @@ import { kphToMps, mpsToKph, timeDiff, pad } from './utils.js';
 import { models } from './models/models.js';
 import { ControlMode, } from './ble/enums.js';
 import { TimerStatus, EventType, } from './activity/enums.js';
+import { extendInterval } from './workouts/extend.js';
 
 // const timer = new Worker('./timer.js');
 const timer = new Worker(new URL('./timer.js', import.meta.url));
@@ -466,6 +467,30 @@ xf.reg('watch:workoutTextEvent', (message, db) => {
     db.workoutTextEvent = message;
 });
 xf.reg('watch:intervalIndex', (index, db) => db.intervalIndex    = index);
+
+// More time on this interval (this fork, Nov 13, 2026, rider: "I want the
+// ability to add time to an interval ... if I'm cooling down and just want
+// a little more time, I should just be able to click a plus button to add
+// 5 minutes at a time"). The time goes on the interval's last step, so a
+// ramp (a cool-down) finishes and then holds its last power; the clocks,
+// the workout graph and Time Left follow. The workout is copied first so
+// the library's copy is never changed; the ride in progress keeps the
+// longer one through a reload.
+xf.reg('ui:interval-extend', (seconds, db) => {
+    const add = Number(seconds) > 0 ? Number(seconds) : 300;
+    if(db.workoutStatus !== 'started') return;
+    const i = db.intervalIndex;
+    const res = extendInterval(db.workout, i, add);
+    if(!res) return;
+    db.workout = res.workout;
+    xf.dispatch('watch:lapTime',     (db.lapTime ?? 0) + add);
+    xf.dispatch('watch:lapDuration', (db.intervalDuration ?? 0) + add);
+    if(db.stepIndex === res.last) {
+        xf.dispatch('watch:stepTime',     (db.stepTime ?? 0) + add);
+        xf.dispatch('watch:stepDuration', (db.stepDuration ?? 0) + add);
+    }
+    xf.dispatch('interval:extended', {interval: i, added: add});
+});
 xf.reg('watch:stepIndex',     (index, db) => {
     db.stepIndex         = index;
     const intervalIndex  = db.intervalIndex;

@@ -10,6 +10,7 @@ function Keyboard() {
     const isKeyS     = (code) => code === 'KeyS';
     const isKeyL     = (code) => code === 'KeyL';
     const isKeySpace = (code) => code === 'Space';
+    const isKeyPlus  = (code) => code === 'NumpadAdd' || code === 'Equal';
 
     window.addEventListener('keydown', onKeydown.bind(this));
 
@@ -19,6 +20,12 @@ function Keyboard() {
 
         // typing in a field (the target or Workout % inputs) is the field's
         if(['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target?.tagName)) return;
+
+        // Shift + = is + on most keyboards
+        if(e.shiftKey && !e.ctrlKey && !e.altKey && code === 'Equal') {
+            xf.dispatch('ui:interval-extend', 300);
+            return;
+        }
 
         // Shift + Up / Down: the ERG target itself, 5 W a press
         if(e.shiftKey && !e.ctrlKey && !e.altKey && (isKeyUp(code) || isKeyDown(code))) {
@@ -55,6 +62,10 @@ function Keyboard() {
         }
         if(isKeyL(code)) {
             xf.dispatch('key:l');
+        }
+        // + (or =): five more minutes on this interval
+        if(isKeyPlus(code)) {
+            xf.dispatch('ui:interval-extend', 300);
         }
         if(isKeySpace(code)) {
             e.preventDefault();
