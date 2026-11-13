@@ -3783,6 +3783,29 @@ intensity-control.changed .number-input--value {
     font-weight: bold;
 }
 
+/* +5 min on an interval, in its heading */
+interval-extend {
+    display: inline-block;
+    vertical-align: middle;
+    margin-left: 0.5em;
+}
+.interval-extend--btn {
+    font: inherit;
+    font-size: 0.85em;
+    font-weight: 700;
+    text-transform: none;
+    color: var(--foreground-color);
+    background: var(--chrome, #333);
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    padding: 0.1em 0.7em;
+    cursor: pointer;
+}
+.interval-extend--btn:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+
 /* the Lap section (this fork): shown by the desktop layout below */
 .lap-section {
     display: none;

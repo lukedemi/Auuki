@@ -853,6 +853,29 @@ class IntensityControl extends HTMLElement {
 
 customElements.define('intensity-control', IntensityControl);
 
+// +5 min on the interval being ridden (watch.js extendInterval); enabled
+// while a workout runs
+class IntervalExtend extends HTMLElement {
+    connectedCallback() {
+        this.abortController = new AbortController();
+        const signal = { signal: this.abortController.signal };
+        const seconds = parseInt(this.getAttribute('seconds') ?? '300');
+        this.innerHTML = `<button type="button" class="interval-extend--btn" title="Add ${seconds / 60} min to this interval (+ key)">+${seconds / 60} min</button>`;
+        this.$btn = this.querySelector('button');
+        this.$btn.disabled = true;
+        this.$btn.addEventListener('pointerup', (e) => {
+            e.stopPropagation();
+            if(!this.$btn.disabled) xf.dispatch('ui:interval-extend', seconds);
+        }, signal);
+        xf.sub('db:workoutStatus', (st) => { this.$btn.disabled = st !== 'started'; }, signal);
+    }
+    disconnectedCallback() {
+        this.abortController.abort();
+    }
+}
+
+customElements.define('interval-extend', IntervalExtend);
+
 // L/R balance, as 49/51, from a two-sided power meter (db.balance: the
 // left's %); "--" without one
 class BalanceValue extends DataView {
