@@ -91,3 +91,53 @@ class WorkKj extends HTMLElement {
 }
 
 customElements.define('work-kj', WorkKj);
+
+// TSS so far (rider, Nov 13, 2026: "throw TSS in there, even if it's pretty
+// small next to something"), shown small in the Work tile's heading.
+// The standard arithmetic on one sample a second: NP is the fourth-power
+// mean of the 30 s rolling average, IF = NP / FTP, and
+// TSS = seconds x NP x IF / (FTP x 3600) x 100.
+export function normalizedPower(watts = []) {
+    if(!watts.length) return 0;
+    const n = 30;
+    let sum = 0, acc = 0, count = 0;
+    for(let i = 0; i < watts.length; i++) {
+        sum += watts[i] || 0;
+        if(i >= n) sum -= watts[i - n] || 0;
+        if(i >= n - 1 || watts.length < n) {
+            const avg = sum / Math.min(i + 1, n);
+            acc += avg ** 4;
+            count++;
+        }
+    }
+    return count ? (acc / count) ** 0.25 : 0;
+}
+
+export function tss(watts = [], ftp = 0) {
+    if(!(ftp > 0) || !watts.length) return 0;
+    const np = normalizedPower(watts);
+    return watts.length * np * (np / ftp) / (ftp * 3600) * 100;
+}
+
+let tssFtp = 0;
+let tssSubscribed = false;
+
+class TssValue extends HTMLElement {
+    connectedCallback() {
+        if(!tssSubscribed) {
+            tssSubscribed = true;
+            xf.sub('db:ftp', (v) => { tssFtp = v; xf.dispatch('tss:update'); });
+        }
+        this.abortController = new AbortController();
+        const signal = {signal: this.abortController.signal};
+        xf.sub('live:sample', (samples) => this.render(samples), signal);
+        xf.sub('tss:update', () => this.render(liveSamples.all()), signal);
+        this.render(liveSamples.all());
+    }
+    disconnectedCallback() { this.abortController.abort(); }
+    render(samples = []) {
+        this.textContent = samples.length && tssFtp > 0 ? String(Math.round(tss(samples.map((r) => r.w || 0), tssFtp))) : '--';
+    }
+}
+
+customElements.define('tss-value', TssValue);
