@@ -298,14 +298,12 @@ class DistanceValue extends DataView {
         const miles = (meters / 1609.34);
         const yards = this.metersToYards(meters);
 
+        // always miles or km, so the tile's unit label is true (it switched
+        // to yards / meters under one unit)
         if(equals(measurement, 'imperial')) {
-            const yardsTemplate = `${(this.metersToYards(meters)).toFixed(0)}`;
-            const milesTemplate = `${miles.toFixed(2)}`;
-            return value = (yards < 1609.34) ? yardsTemplate : milesTemplate;
+            return value = `${miles.toFixed(2)}`;
         } else {
-            const metersTemplate = `${meters.toFixed(0)}`;
-            const kmTemplate = `${km.toFixed(2)}`;
-            return value = (meters < 1000) ? metersTemplate : kmTemplate;
+            return value = `${km.toFixed(2)}`;
         }
     }
     transform(state) {
@@ -845,6 +843,21 @@ class IntensityControl extends HTMLElement {
 }
 
 customElements.define('intensity-control', IntensityControl);
+
+// L/R balance, as 49/51, from a two-sided power meter (db.balance: the
+// left's %); "--" without one
+class BalanceValue extends DataView {
+    getDefaults() {
+        return { prop: 'db:balance', };
+    }
+    transform(left) {
+        if(left === null || left === undefined) return '--';
+        const l = Math.round(left);
+        return `${l}/${100 - l}`;
+    }
+}
+
+customElements.define('balance-value', BalanceValue);
 
 
 class ResistanceTargetControl extends PowerTargetControl {
@@ -1635,12 +1648,14 @@ class MeasurementUnit extends DataView {
             prop: 'db:measurement',
         };
     }
+    // type="weight" (the default), "speed" or "distance"
     formatUnit(measurement = models.measurement.default) {
-        if(measurement === 'imperial') {
-            return `lbs`;
-        } else {
-            return `kg`;
-        }
+        const units = {
+            weight:   ['lbs', 'kg'],
+            speed:    ['mph', 'km/h'],
+            distance: ['mi', 'km'],
+        }[this.getAttribute('type') ?? 'weight'] ?? ['lbs', 'kg'];
+        return measurement === 'imperial' ? units[0] : units[1];
     }
     transform(state) {
         return this.formatUnit(state);

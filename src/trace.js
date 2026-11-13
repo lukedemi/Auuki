@@ -39,7 +39,7 @@ function Trace(args = {}) {
     let timer;
     let logWindow = {at: 0, n: 0, dropped: 0};
 
-    const st = {power: 0, hr: 0, cad: 0, target: 0, sent: null, ratio: null, mode: null, status: 'stopped', elapsed: 0, intensity: 100};
+    const st = {power: 0, hr: 0, cad: 0, target: 0, sent: null, ratio: null, mode: null, status: 'stopped', elapsed: 0, intensity: 100, bal: null};
 
     function push(kind, data) {
         if(!enabled) return;
@@ -104,6 +104,7 @@ function Trace(args = {}) {
         xf.sub('db:power1s',     (v) => st.power = v);
         xf.sub('db:heartRate',   (v) => st.hr = v);
         xf.sub('db:cadence',     (v) => st.cad = v);
+        xf.sub('db:balance',     (v) => st.bal = v);
         xf.sub('db:powerTarget', (v) => st.target = v);
         xf.sub('trainer:powerTarget', (v) => st.sent = v);
         xf.sub('powerMatch:status', (s) => st.ratio = s?.active ? Math.round(s.ratio * 10000) / 10000 : null);

@@ -18,8 +18,8 @@ describe('LiveSamples', () => {
         xf.dispatch('db:power1s', {power1s: 255});
         xf.dispatch('watch:elapsed', 2);
         expect(ls.all()).toEqual([
-            {t: 1, w: 250, hr: 140, target: 260},
-            {t: 2, w: 255, hr: 140, target: 260},
+            {t: 1, w: 250, hr: 140, target: 260, bal: null},
+            {t: 2, w: 255, hr: 140, target: 260, bal: null},
         ]);
     });
 
@@ -45,7 +45,12 @@ describe('live chart arithmetic', () => {
     });
 
     test('window stats: mean power, mean HR over the samples that have one', () => {
-        expect(windowStats([{w: 200, hr: 0}, {w: 300, hr: 150}])).toEqual({w: 250, hr: 150});
-        expect(windowStats([])).toEqual({w: null, hr: null});
+        expect(windowStats([{w: 200, hr: 0}, {w: 300, hr: 150}])).toEqual({w: 250, hr: 150, bal: null});
+        expect(windowStats([])).toEqual({w: null, hr: null, bal: null});
+    });
+
+    test('window balance is weighted by power and leaves out coasting', () => {
+        const rows = [{w: 300, hr: 150, bal: 48}, {w: 100, hr: 150, bal: 52}, {w: 0, hr: 150, bal: 80}];
+        expect(windowStats(rows).bal).toBe(49);   // (48 x 300 + 52 x 100) / 400
     });
 });

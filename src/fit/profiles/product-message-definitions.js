@@ -37,6 +37,7 @@ const productMessageDefinitions = [
         'total_hemoglobin_conc',
         'saturated_hemoglobin_percent',
         'core_temperature',
+        'left_right_balance',
     ], 3],
     ['hrv', [
         ['time', 10],
