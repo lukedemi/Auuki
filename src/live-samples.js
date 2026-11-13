@@ -15,15 +15,17 @@ import { xf, exists } from './functions.js';
 function LiveSamples(args = {}) {
     const max = args.max ?? 12 * 3600;
     let samples = [];
-    const latest = { w: 0, hr: 0, target: 0, bal: null, iv: 0, st: 0, workout: 'stopped' };
+    const latest = { w: 0, hr: 0, cad: 0, target: 0, bal: null, iv: 0, st: 0, workout: 'stopped' };
+    // +5 min presses this ride (watch.js ui:interval-extend): {iv, added, t}
+    let extensions = [];
 
     function onElapsed(t) {
         if(!exists(t) || t <= 0) return;
         const last = samples[samples.length - 1];
-        if(last && t < last.t) samples = [];
+        if(last && t < last.t) { samples = []; extensions = []; }
         if(last && t === last.t && samples.length) return;
         const inWorkout = latest.workout === 'started';
-        samples.push({ t, w: latest.w ?? 0, hr: latest.hr ?? 0, target: latest.target ?? 0, bal: latest.bal,
+        samples.push({ t, w: latest.w ?? 0, hr: latest.hr ?? 0, cad: latest.cad ?? 0, target: latest.target ?? 0, bal: latest.bal,
                        iv: inWorkout ? latest.iv : -1, st: inWorkout ? latest.st : -1 });
         if(samples.length > max) samples.shift();
         xf.dispatch('live:sample', samples);
@@ -41,6 +43,8 @@ function LiveSamples(args = {}) {
         xf.sub('live:restore',   onRestore);
         xf.sub('db:power1s',     (v) => latest.w = v);
         xf.sub('db:heartRate',   (v) => latest.hr = v);
+        xf.sub('db:cadence',     (v) => latest.cad = v);
+        xf.sub('interval:extended', (r) => { if(r) extensions.push({iv: r.interval, added: r.added, t: samples[samples.length - 1]?.t ?? 0}); });
         xf.sub('db:powerTarget', (v) => latest.target = v);
         xf.sub('db:balance',     (v) => latest.bal = v);
         xf.sub('db:intervalIndex', (v) => latest.iv = v);
@@ -55,7 +59,8 @@ function LiveSamples(args = {}) {
         onRestore,
         latest,
         all: () => samples,
-        reset: () => { samples = []; xf.dispatch('live:sample', samples); },
+        extensions: () => extensions.slice(),
+        reset: () => { samples = []; extensions = []; xf.dispatch('live:sample', samples); },
     });
 }
 

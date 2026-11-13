@@ -643,6 +643,12 @@ class Activity extends Model {
         xf.dispatch('activity:add', summary);
         return summary;
     }
+    extended(presses = [], workout) {
+        const n = workout?.intervals?.length ?? 0;
+        const by = new Map();
+        for(const p of presses) by.set(p.iv, (by.get(p.iv) ?? 0) + (p.added || 0));
+        return [...by].map(([iv, added]) => ({iv, added, last: n > 0 && iv === n - 1}));
+    }
     planWatts(samples, workout, ftp) {
         const intervals = workout?.intervals ?? [];
         return samples.map((r) => {
@@ -688,8 +694,12 @@ class Activity extends Model {
                 w:      samples.map((r) => Math.round(r.w || 0)),
                 hr:     samples.map((r) => Math.round(r.hr || 0)),
                 target: samples.map((r) => Math.round(r.target || 0)),
+                cad:    samples.map((r) => Math.round(r.cad || 0)),
+                bal:    samples.map((r) => (r.bal === null || r.bal === undefined) ? null : r.bal),
                 // what the workout said that second, as written, at this FTP: the image's blocks
                 plan: this.planWatts(samples, db.workout, db.ftp),
+                // +5 min presses, per interval; last: it was the workout's last interval (the cool-down)
+                extended: this.extended(liveSamples.extensions(), db.workout),
                 // the trainer room once a minute, from Home Assistant (room.js), when it was reachable
                 room: room.log(),
             };
