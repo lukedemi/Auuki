@@ -23,7 +23,7 @@ import { normalizedPower } from './views/time-left.js';
 import { roomSummary } from './room.js';
 
 const W = 1600, H = 1000;
-const L = 70, R = 40, T = 215, B = 950;
+const L = 70, R = 40, T = 160, B = 950;
 const PW = W - L - R, PH = B - T;
 
 // Coggan's boundaries as % of FTP, the colours TrainerRoad's eye expects
@@ -197,7 +197,7 @@ export function cardModel(chart, {name = ''} = {}) {
         [hrs.length ? String(Math.round(mean(hrs))) : '—', 'avg bpm'],
     ];
 
-    return {v: 1, title: cleanTitle(name) || 'Ride', ftp: ftp || 300, end, step, pts, blocks, set, free: [], labels, stats, lines: funLines(chart)};
+    return {v: 1, title: cleanTitle(name) || 'Ride', ftp: ftp || 300, end, step, pts, blocks, set, free: [], labels, stats, extras: extras(chart)};
 }
 
 // ---------------------------------------------------------------- the extras
@@ -219,32 +219,42 @@ export function roomLine(r, {fansOff = true} = {}) {
     return parts.length ? `Room  ${parts.join(' · ')}` : '';
 }
 
-// The lines under the numbers (rider, Nov 13, 2026: "make sure other fun
-// things are on there as lines if they would be interesting"): each only
-// when the ride carries it.
-export function funLines(chart = {}) {
-    const lines = [];
-    const room = roomLine(roomSummary(chart.room ?? []), {fansOff: false});
-    if(room) lines.push(room.replace(/^Room {2}/, 'Room '));
+// The extras, drawn as lines on the chart (rider, Nov 13, 2026: "I was
+// thinking lines on the chart rather than more text"): the room's temperature
+// and CO2 from Home Assistant, cadence, and when a fan was on. Each only when
+// the ride carries it, each on its own scale.
+export function extras(chart = {}) {
+    const room = (chart.room ?? []).filter((r) => typeof r?.t === 'number');
+    const series = (k) => room.filter((r) => typeof r[k] === 'number' && Number.isFinite(r[k])).map((r) => [r.t, r[k]]);
+    const out = {temp: series('temp'), co2: series('co2'), cad: [], fan: []};
+    if(out.temp.length < 2) out.temp = [];
+    if(out.co2.length < 2) out.co2 = [];
 
-    const parts = [];
-    const cads = (chart.cad ?? []).filter((c) => c > 0);
-    if(cads.length >= 60) parts.push(`${Math.round(cads.reduce((a, b) => a + b, 0) / cads.length)} rpm`);
-    // left/right, weighted by power, pedalling only
-    let wsum = 0, lsum = 0;
-    (chart.bal ?? []).forEach((b, i) => {
-        const w = chart.w?.[i] ?? 0;
-        if(b === null || b === undefined || !(w > 0)) return;
-        wsum += w; lsum += b * w;
-    });
-    if(wsum > 0) { const l = Math.round(lsum / wsum); parts.push(`L/R ${l}/${100 - l}`); }
-    for(const e of chart.extended ?? []) {
-        const min = Math.round((e.added || 0) / 60);
-        if(min > 0) parts.push(`${e.last ? 'cool-down' : `interval ${e.iv + 1}`} +${min} min`);
+    // cadence: 60 s means of the seconds pedalled; a stop is a gap
+    const t = chart.t ?? [], cad = chart.cad ?? [];
+    if(cad.filter((c) => c > 0).length >= 60) {
+        for(let i = 0; i < cad.length; i += 60) {
+            const part = cad.slice(i, i + 60).filter((c) => c > 0);
+            out.cad.push([t[Math.min(i + 59, t.length - 1)] ?? i + 60, part.length >= 20 ? part.reduce((a, b) => a + b, 0) / part.length : null]);
+        }
     }
-    if(parts.length) lines.push(parts.join(' · '));
-    return lines;
+
+    // a fan on from one room reading to the next
+    for(let i = 0; i < room.length; i++) {
+        const on = room[i].front || room[i].rear;
+        const s1 = room[i + 1]?.t ?? (t[t.length - 1] ?? room[i].t);
+        const last = out.fan[out.fan.length - 1];
+        if(on && last && last.s1 === room[i].t) last.s1 = s1;
+        else if(on && s1 > room[i].t) out.fan.push({s0: room[i].t, s1});
+    }
+    return out;
 }
+
+const EXTRA = {
+    temp: {colour: '#f6b26b', label: 'room °F', unit: (v) => `${v.toFixed(1)}°F`, span: 4},
+    co2:  {colour: '#b39dff', label: 'CO₂',     unit: (v) => `${Math.round(v).toLocaleString('en-US')} ppm`, span: 300},
+    cad:  {colour: '#4dd0e1', label: 'cadence', unit: (v) => `${Math.round(v)} rpm`, span: 30},
+};
 
 // ---------------------------------------------------------------- the picture
 
@@ -264,14 +274,11 @@ export function cardSvg(m) {
     out.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif">`);
     out.push(`<rect width="${W}" height="${H}" fill="#14161b"/>`);
 
-    // no title (rider, Nov 13, 2026): the numbers at the top, the extras under them
+    // no title (rider, Nov 13, 2026): the numbers at the top
     m.stats.forEach(([v, lab], k) => {
         const sx = L + k * 245;
         out.push(`<text x="${sx}" y="88" fill="#fff" font-size="44" font-weight="700">${escXml(v)}</text>`);
         out.push(`<text x="${sx}" y="116" fill="#7d8390" font-size="20" letter-spacing="1">${escXml(lab.toUpperCase())}</text>`);
-    });
-    (m.lines ?? []).slice(0, 2).forEach((line, k) => {
-        out.push(`<text x="${L}" y="${158 + k * 32}" fill="#c4c8d0" font-size="24">${escXml(line)}</text>`);
     });
 
     for(const pct of [55, 75, 90, 105, 120, 150]) {
@@ -297,6 +304,37 @@ export function cardSvg(m) {
     const hp = m.pts.map((p, i) => (hs[i] > 60 ? `${f(x(p[0]))},${f(yh(hs[i]))}` : null)).filter(Boolean);
     if(hp.length > 1) out.push(`<polyline points="${hp.join(' ')}" fill="none" stroke="#ff6b6b" stroke-width="2" opacity="0.85"/>`);
 
+    // the extras: each on its own scale in the lower half, its last value at its end
+    const ex = m.extras ?? {};
+    const tags = [];
+    for(const key of ['temp', 'co2', 'cad']) {
+        const pts = (ex[key] ?? []).filter((p) => p[1] !== null && p[1] !== undefined);
+        if(pts.length < 2) continue;
+        const vals = pts.map((p) => p[1]);
+        let lo = Math.min(...vals), hi = Math.max(...vals);
+        if(hi - lo < EXTRA[key].span) { const mid = (hi + lo) / 2; lo = mid - EXTRA[key].span / 2; hi = mid + EXTRA[key].span / 2; }
+        const ye = (v) => (B - PH * 0.1) - (PH * 0.32) * (v - lo) / (hi - lo);
+        // a gap (a stop) breaks the line
+        const runs = [[]];
+        for(const p of ex[key]) {
+            if(p[1] === null || p[1] === undefined) { if(runs[runs.length - 1].length) runs.push([]); continue; }
+            runs[runs.length - 1].push(`${f(x(p[0]))},${f(ye(p[1]))}`);
+        }
+        for(const r of runs) if(r.length > 1) out.push(`<polyline points="${r.join(' ')}" fill="none" stroke="${EXTRA[key].colour}" stroke-width="2.4" stroke-linejoin="round" opacity="0.95"/>`);
+        const lastP = pts[pts.length - 1];
+        tags.push({key, x: x(lastP[0]), y: ye(lastP[1]), text: EXTRA[key].unit(lastP[1])});
+    }
+    // the end values, kept apart
+    tags.sort((a, b) => a.y - b.y);
+    for(let i = 1; i < tags.length; i++) if(tags[i].y - tags[i - 1].y < 24) tags[i].y = tags[i - 1].y + 24;
+    for(const tg of tags) {
+        out.push(`<text x="${f(Math.min(tg.x, W - R) - 6)}" y="${f(tg.y - 8)}" fill="${EXTRA[tg.key].colour}" font-size="19" font-weight="600" text-anchor="end">${escXml(tg.text)}</text>`);
+    }
+    // a fan on: a strip along the bottom
+    for(const r of ex.fan ?? []) {
+        out.push(`<rect x="${f(x(r.s0))}" y="${B - 8}" width="${f(Math.max(1, x(r.s1) - x(r.s0)))}" height="7" fill="#6fb7ff" opacity="0.85"/>`);
+    }
+
     const many = m.labels.length > 6;
     for(const r of m.labels) {
         const cx = (x(r.s0) + x(r.s1)) / 2;
@@ -321,8 +359,14 @@ export function cardSvg(m) {
     if(m.set?.length) items.push([`<line x1="0" x2="26" y1="-6" y2="-6" stroke="#fff" stroke-width="2" stroke-dasharray="6 4" opacity="0.8"/>`, 'target set', 140]);
     items.push([`<line x1="0" x2="26" y1="-6" y2="-6" stroke="#f4f6fa" stroke-width="3"/>`, 'power', 112]);
     items.push([`<line x1="0" x2="26" y1="-6" y2="-6" stroke="#ff6b6b" stroke-width="3"/>`, 'heart rate', 128]);
+    for(const key of ['temp', 'co2', 'cad']) {
+        if((m.extras?.[key] ?? []).filter((p) => p[1] !== null).length > 1) {
+            items.push([`<line x1="0" x2="26" y1="-6" y2="-6" stroke="${EXTRA[key].colour}" stroke-width="3"/>`, EXTRA[key].label, 34 + 10 * EXTRA[key].label.length + 26]);
+        }
+    }
+    if(m.extras?.fan?.length) items.push([`<rect x="0" y="-11" width="26" height="7" fill="#6fb7ff"/>`, 'fan on', 104]);
     const plateW = items.reduce((a, it) => a + it[2], 0) + 16;
-    out.push(`<g transform="translate(${L + 12},${B - 14})"><rect x="0" y="-26" width="${plateW}" height="34" rx="6" fill="#14161b" opacity="0.82"/>`);
+    out.push(`<g transform="translate(${L + 12},${B - 20})"><rect x="0" y="-26" width="${plateW}" height="34" rx="6" fill="#14161b" opacity="0.82"/>`);
     let lx = 12;
     for(const [mark, label, w] of items) {
         out.push(`<g transform="translate(${lx},0)">${mark}<text x="34" y="0" fill="#c4c8d0" font-size="18">${label}</text></g>`);
