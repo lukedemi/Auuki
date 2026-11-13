@@ -2681,10 +2681,11 @@ activity-item {
         cursor: not-allowed;
     }
     .action--image {
-        cursor: not-allowed;
+        cursor: pointer;
 
-        svg {
-            fill: var(--gray);
+        &.busy {
+            cursor: progress;
+            opacity: 0.5;
         }
     }
 }

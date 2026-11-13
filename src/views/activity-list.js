@@ -1,6 +1,42 @@
 import { xf, formatDate, } from '../functions.js';
 import { models } from '../models/models.js';
 import { formatTime, } from '../utils.js';
+import { chartFromFit, cardModel, cardSvg, svgToPng, fileName as pngName } from '../ride-card.js';
+
+// the workout loaded now: an older ride's targets come from it (ride-card.js)
+let loadedWorkout = null;
+xf.sub('db:workout', (w) => loadedWorkout = w);
+
+// The image button (rider, Nov 13, 2026): the ride drawn for Strava, saved as
+// a PNG; on a phone, the share sheet.
+async function rideImage(id) {
+    const record = await models.activity.get(id);
+    if(!record) throw new Error('that ride is no longer saved');
+    let chart = record.chart;
+    if(!chart?.t?.length) {
+        chart = chartFromFit(new DataView(await record.blob.arrayBuffer()), {
+            name: record.summary?.name,
+            workout: loadedWorkout,
+            toAbsolute: (v, ftp) => models.ftp.toAbsolute(v, ftp),
+        });
+    }
+    if(!chart?.t?.length) throw new Error('this ride has no samples to draw');
+    const png = await svgToPng(cardSvg(cardModel(chart, {name: record.summary?.name})));
+    const name = pngName(record.summary?.timestamp);
+    const file = typeof File === 'function' ? new File([png], name, {type: 'image/png'}) : null;
+    const mobile = window.matchMedia?.('(pointer: coarse)')?.matches;
+    if(mobile && file && navigator.canShare?.({files: [file]})) {
+        try { await navigator.share({files: [file]}); return; }
+        catch(e) { if(e.name === 'AbortError') return; }
+    }
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(png);
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+}
 
 class ActivityList extends HTMLElement {
     constructor() {
@@ -193,6 +229,15 @@ class ActivityItem extends HTMLElement {
 
         if(action === ':download') {
             models.activity.download(this.id);
+            return;
+        }
+        if(action === ':image') {
+            const $btn = this.querySelector('.action--image');
+            if($btn?.classList.contains('busy')) return;
+            $btn?.classList.add('busy');
+            rideImage(this.id)
+                .catch((e) => { console.error('ride image:', e); alert(`The image did not draw: ${e.message}`); })
+                .finally(() => $btn?.classList.remove('busy'));
             return;
         }
         if(action === ':strava:upload') {
