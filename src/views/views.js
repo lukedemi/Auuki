@@ -14,6 +14,7 @@ import './live-chart.js';
 import './session-notice.js';
 import './time-left.js';
 import './fit-text.js';
+import './pause-overlay.js';
 import './watch.js';
 import './ant-device-scan.js';
 import './keyboard.js';
