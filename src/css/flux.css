@@ -2709,7 +2709,7 @@ activity-item {
 .activity--actions {
     display: none;
     display: grid;
-    grid-template-columns: 40% 1fr 1fr 1fr 1fr;
+    grid-template-columns: 40% 1fr 1fr 1fr;
     /* grid-template-columns: 8rem 8rem 1fr 1fr 8rem 4rem; */
     align-items: center;
     line-height: 4em;

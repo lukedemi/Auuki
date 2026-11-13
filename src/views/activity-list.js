@@ -102,15 +102,6 @@ class ActivityList extends HTMLElement {
                                     </view-action>
 
                                     <view-action
-                                        class="activity--action"
-                                        action=":strava:upload"
-                                        topic=":activity:${this.id(data)}">
-                                        <svg class="activity--icon strava--icon" width="24" height="24">
-                                            <use href="#icon--strava" />
-                                        </svg>
-                                        <div class="connection-icon-switch--indicator ${status.strava ?? 'none'} strava"></div>
-                                    </view-action>
-                                    <view-action
                                         class="activity--action action--download"
                                         action=":download"
                                         topic=":activity:${this.id(data)}">

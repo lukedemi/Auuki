@@ -186,7 +186,6 @@ class RideSummary extends HTMLElement {
                     <section>
                         <h3>Upload</h3>
                         <div class="rs--up" data-up="intervals"></div>
-                        <div class="rs--up" data-up="strava"></div>
                     </section>
                 </div>
             </div>
@@ -309,7 +308,7 @@ class RideSummary extends HTMLElement {
     // ------------------------------------------------------------ uploads
 
     renderUploads() {
-        for(const service of ['intervals', 'strava']) {
+        for(const service of ['intervals']) {
             const $el = this.querySelector(`[data-up="${service}"]`);
             if(!$el) continue;
             const label = service === 'intervals' ? 'intervals.icu' : 'Strava';
