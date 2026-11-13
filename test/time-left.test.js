@@ -32,3 +32,23 @@ describe('total kJ', () => {
         expect(totalKj([])).toBe(0);
     });
 });
+
+import { normalizedPower, tss } from '../src/views/time-left.js';
+
+describe('TSS', () => {
+    test('an hour at FTP is 100', () => {
+        expect(Math.round(tss(Array(3600).fill(295), 295))).toBe(100);
+    });
+    test('an hour of steady 70% is 49', () => {
+        expect(Math.round(tss(Array(3600).fill(206.5), 295))).toBe(49);
+    });
+    test('NP sits above the average when the power varies', () => {
+        const w = Array.from({length: 3600}, (_, i) => (Math.floor(i / 120) % 2 ? 350 : 150));
+        const avg = w.reduce((a, b) => a + b, 0) / w.length;
+        expect(normalizedPower(w)).toBeGreaterThan(avg + 20);
+    });
+    test('no FTP or no ride is 0', () => {
+        expect(tss([200, 200], 0)).toBe(0);
+        expect(tss([], 295)).toBe(0);
+    });
+});

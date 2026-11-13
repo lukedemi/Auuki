@@ -3774,6 +3774,15 @@ intensity-control.changed .number-input--value {
     outline-offset: -3px;
 }
 
+/* a small companion number in a tile's heading (TSS beside Work kJ) */
+.tile-sub {
+    opacity: 0.85;
+    font-variant-numeric: tabular-nums;
+}
+.tile-sub tss-value {
+    font-weight: bold;
+}
+
 /* the Lap section (this fork): shown by the desktop layout below */
 .lap-section {
     display: none;
