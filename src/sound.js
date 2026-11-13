@@ -21,12 +21,45 @@ function Sound(args) {
     let oscillator;
     let abortController;
 
+    // Chrome will not play audio from a context made without a tap, and an
+    // auto-started ride has no tap: so the context is made, or woken, on the
+    // first touch or key press anywhere (this fork, Nov 13, 2026).
+    function unlock() {
+        try {
+            if(!exists(audioContext)) audioContext = new AudioContext();
+            if(audioContext.state === 'suspended') audioContext.resume();
+        } catch(e) {
+            console.warn(':sound :unlock :error', e);
+        }
+    }
+
+    // a short blip when the volume changes, so its level is heard
+    function blip() {
+        if(!exists(audioContext) || volume <= 0) return;
+        const time = audioContext.currentTime;
+        const osc = new OscillatorNode(audioContext, {type: 'triangle', frequency: notes[5].c});
+        const gain = audioContext.createGain();
+        gain.gain.setValueAtTime(volume / 100, time);
+        gain.gain.setTargetAtTime(0, time + 0.12, 0.01);
+        osc.connect(gain).connect(audioContext.destination);
+        osc.start(time);
+        osc.stop(time + 0.2);
+    }
+
     function start() {
         abortController = new AbortController();
         let signal = { signal: abortController.signal };
 
+        for(const type of ['pointerdown', 'keydown', 'touchstart']) {
+            window.addEventListener(type, unlock, {capture: true, passive: true, signal: abortController.signal});
+        }
+
+        let first = true;
         xf.sub(`db:volume`, x => {
             volume = x;
+            if(first) { first = false; return; }
+            unlock();
+            blip();
         }, signal);
 
         xf.sub('watch:started', _ => {
@@ -36,6 +69,10 @@ function Sound(args) {
         }, signal);
 
         xf.sub('watch:beep', _ => {
+            if(!exists(audioContext)) unlock();
+            if(audioContext?.state === 'suspended') audioContext.resume();
+            xf.dispatch('sound:beep', {volume, state: audioContext?.state ?? 'none'});
+            if(!exists(audioContext) || volume <= 0) return;
             interval();
         }, signal);
 

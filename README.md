@@ -19,6 +19,9 @@ node scripts/traces.mjs                          # the latest sessions
 node scripts/traces.mjs latest --kind event,error,mark --since 30m --follow
 ```
 
+- **Workout intensity**: under the ERG target, *Workout − 100% +* scales every power target in the workout, 1% a press (50–150%); tap the number to go back to 100%. A change rescales the current target by the ratio, so a nudge on this interval survives it. The ERG target itself moves 5 W a press (was 10).
+- **Interval beeps you can hear**: the volume starts at 50 (upstream shipped at 0, so the 4-second countdown into each interval was silent), audio unlocks on the first touch or key press (an auto-started ride has none), and changing the volume plays a blip at the new level.
+
 Deploy (from `master`, by hand — nothing deploys on merge):
 
 ```bash
