@@ -262,10 +262,12 @@ class Volume extends Target {
         };
         self.min = existance(args.min, 0);
         self.max = existance(args.max, 100);
-        self.step = existance(args.max, 10);
+        self.step = existance(args.step, 10);
         self.storage = new args.storage(storageModel);
     }
-    defaultValue() { return 0; }
+    // 50, not 0: upstream shipped silent, so the interval beeps never
+    // sounded unless the volume was found and raised (this fork, Nov 13, 2026)
+    defaultValue() { return 50; }
     mute() {
         const self = this;
         return self.set(self.min);
@@ -276,8 +278,22 @@ class PowerTarget extends Target {
     postInit(args = {}) {
         this.min = existance(args.min, 0);
         this.max = existance(args.max, 4000);
-        this.step = existance(args.step, 10);
+        // 5 W a press (was 10; rider, Nov 13, 2026)
+        this.step = existance(args.step, 5);
     }
+}
+
+// The whole workout's intensity, % of every power target (this fork,
+// Nov 13, 2026, rider: "it'd be even better to be able to change the
+// percentage power across the whole workout"). 100 is the workout as
+// written; each step's target is FTP × step % × intensity %.
+class Intensity extends Target {
+    postInit(args = {}) {
+        this.min = existance(args.min, 50);
+        this.max = existance(args.max, 150);
+        this.step = existance(args.step, 1);
+    }
+    defaultValue() { return 100; }
 }
 
 class ResistanceTarget extends Target {
@@ -1060,6 +1076,7 @@ function Session(args = {}) {
 
             // Targets
             powerTarget: db.powerTarget,
+            intensity: db.intensity,
             resistanceTarget: db.resistanceTarget,
             slopeTarget: db.slopeTarget,
 
@@ -1091,6 +1108,7 @@ function Session(args = {}) {
         db.resistanceTarget = 0;
         db.slopeTarget = 0;
         db.powerTarget = 0;
+        db.intensity = 100;
         db.position_lat = 0;
         db.position_long = 0;
         db.altitude = virtualState.altitude;
@@ -1709,6 +1727,7 @@ const virtualState = new VirtualState();
 const speedState   = new SpeedState();
 
 const powerTarget = new PowerTarget({prop: 'powerTarget'});
+const intensity = new Intensity({prop: 'intensity'});
 const resistanceTarget = new ResistanceTarget({prop: 'resistanceTarget'});
 const slopeTarget = new SlopeTarget({prop: 'slopeTarget'});
 const cadenceTarget = new CadenceTarget({prop: 'cadenceTarget'});
@@ -1737,6 +1756,7 @@ const planned = new Planned({prop: 'planned', workoutModel: workout, api: api});
 const session = Session();
 
 let models = {
+    intensity,
     power,
     heartRate,
     cadence,

@@ -51,6 +51,7 @@ let db = {
 
     // Targets
     powerTarget: models.powerTarget.default,
+    intensity: 100,
     resistanceTarget: models.resistanceTarget.default,
     slopeTarget: models.slopeTarget.default,
     cadenceTarget: models.cadenceTarget.default,
@@ -261,6 +262,22 @@ xf.reg('ui:power-target-inc', (_, db) => {
 xf.reg(`ui:power-target-dec`, (_, db) => {
     db.powerTarget = models.powerTarget.dec(db.powerTarget);
 });
+
+// The workout's intensity: a change rescales the current target by the
+// ratio, so a +5 W nudge on this interval survives it; every later step
+// is set from FTP × step % × intensity % (watch.js).
+function setIntensity(db, next) {
+    const old = db.intensity || 100;
+    next = models.intensity.set(next);
+    if(next === old) return;
+    db.intensity = next;
+    if(db.powerTarget > 0) {
+        db.powerTarget = models.powerTarget.set(Math.round(db.powerTarget * next / old));
+    }
+}
+xf.reg('ui:intensity-inc', (_, db) => setIntensity(db, (db.intensity || 100) + models.intensity.step));
+xf.reg('ui:intensity-dec', (_, db) => setIntensity(db, (db.intensity || 100) - models.intensity.step));
+xf.reg('ui:intensity-set', (value, db) => setIntensity(db, parseInt(value)));
 xf.reg('ui:cadence-target-set', (cadenceTarget, db) => {
     db.cadenceTarget = models.cadenceTarget.set(cadenceTarget);
 });

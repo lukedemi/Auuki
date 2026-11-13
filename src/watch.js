@@ -469,7 +469,8 @@ xf.reg('watch:stepIndex',     (index, db) => {
         xf.dispatch('ui:cadence-target-set', 0);
     }
     if(exists(powerTarget)) {
-        xf.dispatch('ui:power-target-set', models.ftp.toAbsolute(powerTarget, db.ftp));
+        // the workout's intensity applies to every step (db.js setIntensity)
+        xf.dispatch('ui:power-target-set', Math.round(models.ftp.toAbsolute(powerTarget, db.ftp) * (db.intensity || 100) / 100));
         if(!exists(slopeTarget) && !equals(db.mode, ControlMode.erg)) {
             xf.dispatch('ui:mode-set', ControlMode.erg);
         }

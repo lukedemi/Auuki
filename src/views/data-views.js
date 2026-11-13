@@ -813,6 +813,39 @@ class PowerTargetControl extends DataView {
 
 customElements.define('power-target-control', PowerTargetControl);
 
+// The workout's intensity, under the ERG target: − 100% +, 1% a press;
+// a press on the number puts it back to 100 (db.js setIntensity)
+class IntensityControl extends HTMLElement {
+    connectedCallback() {
+        this.abortController = new AbortController();
+        const signal = { signal: this.abortController.signal };
+        this.innerHTML = `
+            <div class="intensity--row" style="display:flex;align-items:center;justify-content:center;gap:0.5em;margin-top:0.4em;font-size:0.95em">
+                <span style="opacity:0.7">Workout</span>
+                <button type="button" class="btn" data-act="dec" aria-label="Workout intensity down" style="width:3em;height:1.9em;flex:none;font-size:1.05em">−</button>
+                <button type="button" class="intensity--value" data-act="reset" title="Back to 100%"
+                        style="min-width:3.6em;font:inherit;font-size:1.1em;font-weight:700;color:inherit;background:transparent;border:none;font-variant-numeric:tabular-nums">100%</button>
+                <button type="button" class="btn" data-act="inc" aria-label="Workout intensity up" style="width:3em;height:1.9em;flex:none;font-size:1.05em">+</button>
+            </div>`;
+        this.$value = this.querySelector('.intensity--value');
+        this.addEventListener('pointerup', (e) => {
+            const act = e.target?.closest('[data-act]')?.dataset?.act;
+            if(act === 'inc') xf.dispatch('ui:intensity-inc');
+            if(act === 'dec') xf.dispatch('ui:intensity-dec');
+            if(act === 'reset') xf.dispatch('ui:intensity-set', 100);
+        }, signal);
+        xf.sub('db:intensity', (v) => {
+            this.$value.textContent = `${v}%`;
+            this.$value.style.color = v === 100 ? '' : 'var(--zone-yellow)';
+        }, signal);
+    }
+    disconnectedCallback() {
+        this.abortController.abort();
+    }
+}
+
+customElements.define('intensity-control', IntensityControl);
+
 
 class ResistanceTargetControl extends PowerTargetControl {
     setDefaults() {

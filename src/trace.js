@@ -39,7 +39,7 @@ function Trace(args = {}) {
     let timer;
     let logWindow = {at: 0, n: 0, dropped: 0};
 
-    const st = {power: 0, hr: 0, cad: 0, target: 0, sent: null, ratio: null, mode: null, status: 'stopped', elapsed: 0};
+    const st = {power: 0, hr: 0, cad: 0, target: 0, sent: null, ratio: null, mode: null, status: 'stopped', elapsed: 0, intensity: 100};
 
     function push(kind, data) {
         if(!enabled) return;
@@ -121,6 +121,8 @@ function Trace(args = {}) {
             xf.sub(`${key}:name`, (name) => { if(name && name !== '--') event(`${key}:name`, {device: name}); });
         }
         xf.sub('ble:reconnect', (r) => event('ble:reconnect', r));
+        xf.sub('db:intensity', (v) => { if(v !== st.intensity) event('intensity', {from: st.intensity, to: v}); st.intensity = v; });
+        xf.sub('sound:beep', (r) => event('beep', r));
         xf.sub('powerMatch:debug', (r) => {
             if(r && r.event) event('powerMatch', {what: r.event, target: r.target, sent: r.sent, ratio: r.ratio,
                 trainer: r.trainer, meter: r.meter, steady: r.steady, calm: r.calm});
