@@ -18,9 +18,20 @@ describe('LiveSamples', () => {
         xf.dispatch('db:power1s', {power1s: 255});
         xf.dispatch('watch:elapsed', 2);
         expect(ls.all()).toEqual([
-            {t: 1, w: 250, hr: 140, target: 260, bal: null},
-            {t: 2, w: 255, hr: 140, target: 260, bal: null},
+            {t: 1, w: 250, hr: 140, target: 260, bal: null, iv: -1, st: -1},
+            {t: 2, w: 255, hr: 140, target: 260, bal: null, iv: -1, st: -1},
         ]);
+    });
+
+    test('the workout step each second, only while the workout runs', () => {
+        const ls = LiveSamples();
+        ls.start();
+        xf.dispatch('db:intervalIndex', {intervalIndex: 2});
+        xf.dispatch('db:stepIndex', {stepIndex: 1});
+        xf.dispatch('watch:elapsed', 1);
+        xf.dispatch('db:workoutStatus', {workoutStatus: 'started'});
+        xf.dispatch('watch:elapsed', 2);
+        expect(ls.all().map((r) => [r.iv, r.st])).toEqual([[-1, -1], [2, 1]]);
     });
 
     test('stopping (elapsed 0) keeps the ride; the next ride starts fresh', () => {
