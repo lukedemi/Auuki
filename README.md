@@ -26,7 +26,7 @@ node scripts/traces.mjs latest --kind event,error,mark --since 30m --follow
 - **Units**: imperial by default (a stored choice wins), the units on the Speed and Distance tiles, distance always in mi or km, and the virtual speed now uses the rider's weight (it stayed at an 85 kg default).
 
 - **Desktop layout**: on a landscape screen 1200 x 650 or larger, the numbers stack in a column on the left (Power and Target, Interval Time, HR and Cadence, Power Lap and Elapsed, Time Left and Finish), the live chart and the workout graph take the rest, the ERG target and Workout % sit under them, and the watch and menu share one bottom row. The rules are the last block in `src/css/flux.css`; smaller screens keep upstream's layouts.
-- **Work (kJ)** replaces Slope (always 0.0 in ERG): the ride's power summed second by second. On desktop the column reads Power · Target / Heart Rate · Cadence / Interval Time · Time Left / Power Lap · Work / Elapsed · Finish.
+- **Work (kJ)** replaces Slope (always 0.0 in ERG): the ride's power summed second by second. On desktop the column reads Power · Heart Rate / Cadence · Work / Elapsed · Time Left · Finish, and under it a **Lap** section with everything about the current interval: Interval Left and Target large, Power Lap and HR Lap.
 - **Time Left and Finish** replace Speed and Distance: what remains of the workout (the rest of this interval plus every one after it), and the clock time it will end, which slides later while paused (`src/views/time-left.js`).
 
 Deploy (from `master`, by hand — nothing deploys on merge):
