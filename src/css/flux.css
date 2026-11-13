@@ -3810,19 +3810,63 @@ and (orientation: landscape) {
         height: 100vh;
     }
 
-    /* the connection switches, fixed into the bottom bar between the
-       workout name and the watch; only on the home page, as before */
+    /* The bottom bar, left to right: the workout name, the connection
+       switches, the ERG target and Workout %, the watch, the menu (rider,
+       Nov 13, 2026: "Put everything from that top bar in the bottom bar"
+       and "add target watt and workout percentage to that bottom bar
+       too"). The switches and the targets are fixed into their columns
+       of the bar; they show on the home page only, as before. */
+    :root {
+        --fb-name-w: 140px;
+        --fb-switches-w: 360px;
+        --fb-targets-w: 500px;
+        --fb-watch-w: 190px;
+    }
     #home-page .page-header {
         position: fixed;
         bottom: 0;
-        left: calc(100vw / 6);
-        /* up to just short of the watch, centred in the middle third */
-        width: calc(50vw - 100vw / 6 - 90px);
+        left: var(--fb-name-w);
+        width: var(--fb-switches-w);
         height: 76px;
         z-index: 5;
         background: transparent;
         justify-content: space-evenly;
         gap: 0.4em;
+    }
+    /* with the extra modes on, the mode buttons need the old row under the
+       charts, so the targets stay there */
+    html.erg-only #targets {
+        position: fixed;
+        bottom: 0;
+        left: calc(var(--fb-name-w) + var(--fb-switches-w));
+        width: var(--fb-targets-w);
+        height: 76px;
+        z-index: 5;
+        padding: 0 0.5em;
+        border-top: none;
+        display: flex;
+        align-items: center;
+        font-size: 1rem;
+        --number-input-height: 2.6rem;
+        --number-input-line-height: 2.6rem;
+        --number-input-value-font-size: 1.5rem;
+        --number-input-font-size: 1.4rem;
+    }
+    html.erg-only #targets .targets--cont {
+        width: 100%;
+        max-width: none;
+        display: block;
+    }
+    html.erg-only #targets tab-group {
+        width: 100%;
+        padding: 0;
+    }
+    html.erg-only #targets .target-control--label {
+        font-size: 0.8rem;
+        margin: 0 0 0.2em;
+    }
+    html.erg-only #targets .number-input--value {
+        padding: 0;
     }
     .connections-header {
         font-size: 0.85rem;
@@ -4054,15 +4098,35 @@ and (orientation: landscape) {
         grid-template-rows: 1fr;
         grid-template-columns: repeat(6, 1fr);
     }
+    .fixed-bottom {
+        grid-template-columns: var(--fb-name-w) var(--fb-switches-w) var(--fb-targets-w) var(--fb-watch-w) minmax(0, 1fr);
+    }
     #workout-name {
         grid-area: 1 / 1 / 2 / 2;
     }
     .watch {
-        grid-area: 1 / 3 / 2 / 5;
+        grid-area: 1 / 4 / 2 / 5;
         justify-self: center;
     }
     .menu {
-        grid-area: 1 / 5 / 2 / 7;
+        grid-area: 1 / 5 / 2 / 6;
         border-top: none;
+    }
+}
+
+/* the bottom bar on a narrower desktop: tighter columns, smaller labels */
+@media only screen
+and (min-width: 1200px)
+and (max-width: 1499px)
+and (min-height: 650px)
+and (orientation: landscape) {
+    :root {
+        --fb-name-w: 110px;
+        --fb-switches-w: 280px;
+        --fb-targets-w: 420px;
+        --fb-watch-w: 170px;
+    }
+    .connections-header {
+        font-size: 0.75rem;
     }
 }
