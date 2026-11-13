@@ -268,6 +268,28 @@
                                 </div>
                             </div>
 
+                            <!-- Lap: every number about this interval in one place (rider, Nov 13,
+                                 2026); the desktop layout shows it, the others keep their tiles -->
+                            <section class="lap-section" id="lap-section" aria-label="Lap">
+                                <h2 class="lap-section--heading">Lap</h2>
+                                <div class="lap-tile lap-tile--interval">
+                                    <h3 class="lap-tile--heading">Interval Left</h3>
+                                    <interval-time class="lap-tile--value">--:--</interval-time>
+                                </div>
+                                <div class="lap-tile lap-tile--target">
+                                    <h3 class="lap-tile--heading">Target</h3>
+                                    <power-target class="lap-tile--value">--</power-target>
+                                </div>
+                                <div class="lap-tile lap-tile--power">
+                                    <h3 class="lap-tile--heading">Power Lap</h3>
+                                    <power-lap class="lap-tile--value">--</power-lap>
+                                </div>
+                                <div class="lap-tile lap-tile--hr">
+                                    <h3 class="lap-tile--heading">HR Lap</h3>
+                                    <heart-rate-lap-value class="lap-tile--value">--</heart-rate-lap-value>
+                                </div>
+                            </section>
+
                             <data-tile-switch-group class="data-tile--switch--group">
                                 <div class="data-tile--switch switch-item switch-0 active" index="0">
                                     <div class="data-tile--switch--icon"></div>
