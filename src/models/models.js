@@ -25,6 +25,12 @@ function decodeBase64Utf8(b64 = '') {
     return new TextDecoder('utf-8').decode(bytes);
 }
 
+// the left's % -> FIT left_right_balance (bit 7: the value is the right's)
+function balanceToFit(left) {
+    if(left === null || left === undefined || !(left >= 0 && left <= 100)) return 0xFF;
+    return 0x80 | Math.round(100 - left);
+}
+
 class Model {
     constructor(args = {}) {
         this.init(args);
@@ -541,7 +547,8 @@ class Measurement extends Model {
         self.storage = new args.storage(storageModel);
         self.values = ['metric', 'imperial'];
     }
-    defaultValue() { return 'metric'; }
+    // imperial by default in this fork (a stored choice wins)
+    defaultValue() { return 'imperial'; }
     defaultIsValid(value) { return this.values.includes(value); }
     switch(theme) {
         const self = this;
@@ -1156,6 +1163,9 @@ function Session(args = {}) {
             total_hemoglobin_conc:        db.thb,
             core_temperature:             db.coreBodyTemperature,
             skin_temperature:             db.skinTemperature,
+            // FIT left_right_balance: the right's % with bit 7 set; 0xFF
+            // (invalid) with no two-sided meter
+            left_right_balance:           balanceToFit(db.balance),
             device_index:                 0,
         };
 
@@ -1600,7 +1610,9 @@ class VirtualState extends MetaProp {
             distance: db.distance,
             altitude: db.altitude,
             ascent:   db.ascent,
-            mass:     this.mass,
+            // the rider's weight + 10 kg of bike, once a weight is set; it
+            // stayed at the 85 kg default whatever weight was set
+            mass:     this.systemWeight > 10 ? this.systemWeight : this.mass,
             speed:    this.speed,
             dt:       isNaN(dt) ? 1/4 : dt,
         });
@@ -1807,4 +1819,4 @@ let models = {
     api,
 };
 
-export { models };
+export { models, balanceToFit };

@@ -51,6 +51,7 @@ let db = {
 
     // Targets
     powerTarget: models.powerTarget.default,
+    balance: null,
     intensity: 100,
     resistanceTarget: models.resistanceTarget.default,
     slopeTarget: models.slopeTarget.default,
@@ -176,6 +177,11 @@ xf.reg(models.sources.prop, (sources, db) => {
 xf.reg(models.dockMode.prop, (value, db) => {
     db.dockMode = models.dockMode.set(value);
     models.dockMode.backup(db.dockMode);
+});
+
+// the left's % of the power, or null with no two-sided meter
+xf.reg('balance', (balance, db) => {
+    db.balance = (balance === null || balance === undefined || balance < 0 || balance > 100) ? null : balance;
 });
 
 xf.reg('power1s', (power, db) => {

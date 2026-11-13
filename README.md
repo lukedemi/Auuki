@@ -22,6 +22,9 @@ node scripts/traces.mjs latest --kind event,error,mark --since 30m --follow
 - **Workout intensity**: under the ERG target, *Workout − 100% +* scales every power target in the workout, 1% a press (50–150%); tap the number to go back to 100%. A change rescales the current target by the ratio, so a nudge on this interval survives it. The ERG target itself moves 5 W a press (was 10).
 - **Interval beeps you can hear**: the volume starts at 50 (upstream shipped at 0, so the 4-second countdown into each interval was silent), audio unlocks on the first touch or key press (an auto-started ride has none), and changing the volume plays a blip at the new level.
 
+- **L/R balance**: a two-sided meter (Assioma Duo pairs as one Bluetooth device, the left pedal speaking for both, so its power is already the total) sends the left's share with every power reading; it goes into the FIT as standard `left_right_balance` (the right's % with bit 7 set, as an Edge writes it), the power meter card's L/R tile, the live chart's window average (power-weighted, coasting left out) and the traces.
+- **Units**: imperial by default (a stored choice wins), the units on the Speed and Distance tiles, distance always in mi or km, and the virtual speed now uses the rider's weight (it stayed at an 85 kg default).
+
 Deploy (from `master`, by hand — nothing deploys on merge):
 
 ```bash

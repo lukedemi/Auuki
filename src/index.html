@@ -145,7 +145,7 @@
                             </div>
 
                             <div class="data-tile--small wide" id="data-tile--speed">
-                                <h2 class="data-tile-small--heading">Speed</h2>
+                                <h2 class="data-tile-small--heading">Speed <measurement-unit type="speed" style="opacity:.6;text-transform:none">mph</measurement-unit></h2>
                                     <speed-switch id="distance-value"
                                                   class="data-tile-small--value">--</speed-switch>
                             </div>
@@ -221,7 +221,7 @@
                             </div>
 
                             <div class="data-tile--small wide" id="data-tile--distance">
-                                <h2 class="data-tile-small--heading">Distance</h2>
+                                <h2 class="data-tile-small--heading">Distance <measurement-unit type="distance" style="opacity:.6;text-transform:none">mi</measurement-unit></h2>
                                 <div class="data-tile-small--value-cont">
                                     <distance-value id="distance-value"
                                                     class="data-tile-small--value">--</distance-value>
@@ -1112,16 +1112,8 @@
                                         <power-match-status class="data-view device-card--tile--value">off</power-match-status>
                                     </div>
                                     <div class="device-card--tile">
-                                        <source-switch class="source-switch"
-                                                       for="speed"
-                                                       use="ble:powerMeter">
-                                            <h3 class="device-card--tile--header">Speed</h3>
-                                            <speed-value class="data-view device-card--tile--value">--</speed-value>
-                                            <svg class="toggle--button">
-                                                <use class="on" href="#icon--toggle--on"></use>
-                                                <use class="off" href="#icon--toggle--off"></use>
-                                            </svg>
-                                        </source-switch>
+                                        <h3 class="device-card--tile--header">L/R</h3>
+                                        <balance-value class="data-view device-card--tile--value">--</balance-value>
                                     </div>
                                 </div>
                             </div>

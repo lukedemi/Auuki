@@ -72,11 +72,15 @@ function bucket(rows, cols, pick) {
 
 export function windowStats(rows) {
     const n = rows.length;
-    if(!n) return { w: null, hr: null };
+    if(!n) return { w: null, hr: null, bal: null };
     const w = Math.round(rows.reduce((a, r) => a + (r.w || 0), 0) / n);
     const hrs = rows.filter((r) => r.hr > 0);
     const hr = hrs.length ? Math.round(hrs.reduce((a, r) => a + r.hr, 0) / hrs.length) : null;
-    return { w, hr };
+    // balance weighted by power, as head units average it; pedalling only
+    const bals = rows.filter((r) => r.bal !== null && r.bal !== undefined && r.w > 0);
+    const wsum = bals.reduce((a, r) => a + r.w, 0);
+    const bal = wsum > 0 ? Math.round(bals.reduce((a, r) => a + r.bal * r.w, 0) / wsum) : null;
+    return { w, hr, bal };
 }
 
 class LiveChart extends HTMLElement {
@@ -144,7 +148,7 @@ class LiveChart extends HTMLElement {
 
         const st = windowStats(rows);
         this.$stats.innerHTML = st.w == null ? '' :
-            `avg <b>${st.w}</b> W${st.hr ? ` · <b>${st.hr}</b> bpm` : ''}`;
+            `avg <b>${st.w}</b> W${st.hr ? ` · <b>${st.hr}</b> bpm` : ''}${st.bal !== null ? ` · L/R <b>${st.bal}/${100 - st.bal}</b>` : ''}`;
 
         if(rows.length < 2) {
             this.$svg.innerHTML = `<text class="lc--empty" x="${W / 2}" y="${H / 2}" text-anchor="middle">Draws while the timer runs</text>`;

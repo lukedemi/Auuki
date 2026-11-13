@@ -84,6 +84,7 @@ function ReactiveConnectable(args = {}) {
 
         if(models.sources.isSource('power', getIdentifier())) {
             xf.dispatch(`power`, 0);
+            xf.dispatch('balance', null);
         }
         if(models.sources.isSource('cadence', getIdentifier())) {
             xf.dispatch(`cadence`, 0);
@@ -119,6 +120,15 @@ function ReactiveConnectable(args = {}) {
 
         if('power' in data && models.sources.isSource('power', identifier)) {
             xf.dispatch(`power`, data.power);
+        }
+
+        // L/R balance (this fork, Nov 13, 2026): a power meter with both
+        // sides (Assioma Duo: the left pedal speaks for the pair over
+        // Bluetooth) sends the left's share in each Cycling Power
+        // Measurement; bit 1 of the flags says it is the left's, and with
+        // no reference it is read as the left's too, as head units do
+        if('pedalPowerBalance' in data && models.sources.isSource('power', identifier)) {
+            xf.dispatch('balance', data.pedalPowerBalance);
         }
 
         if('cadence' in data && models.sources.isSource('cadence', identifier)) {
