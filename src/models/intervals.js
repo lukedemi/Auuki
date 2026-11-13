@@ -105,6 +105,13 @@ function Intervals(args = {}) {
                     externalId: `auuki-${record.id ?? record.summary?.id}`,
                 });
                 console.log(`:intervals :direct :upload :success`, result);
+                const icuId = direct.uploadedId(result);
+                if(icuId && record.summary) {
+                    record.summary.intervals_id = icuId;
+                    // RPE, feel and notes set before the upload follow it
+                    try { await direct.updateActivity(icuId, direct.activityFields(record.summary)); }
+                    catch(e) { console.warn(':intervals :direct :update :fail', e); }
+                }
                 return ':success';
             } catch(error) {
                 console.error(`:intervals :direct :upload :fail`, error);

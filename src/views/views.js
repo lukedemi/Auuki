@@ -15,6 +15,7 @@ import './session-notice.js';
 import './time-left.js';
 import './fit-text.js';
 import './pause-overlay.js';
+import './ride-summary.js';
 import './watch.js';
 import './ant-device-scan.js';
 import './keyboard.js';

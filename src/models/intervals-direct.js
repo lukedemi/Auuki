@@ -129,7 +129,42 @@ async function upload(blob, {name, externalId} = {}) {
     return request(`/activities?${params}`, {method: 'POST', body: form});
 }
 
+// the id intervals.icu gave an upload ("i12345"), whatever shape the answer took
+function uploadedId(result) {
+    if(!result) return null;
+    if(typeof result === 'string') { try { result = JSON.parse(result); } catch(e) { return null; } }
+    return result.id ?? result.activities?.[0]?.id ?? (Array.isArray(result) ? result[0]?.id : null) ?? null;
+}
+
+// The end-of-ride screen's fields onto the uploaded activity: name,
+// icu_rpe (1-10), feel (1-5, 1 best) and the notes as its description.
+// PUT /activity/{id} is not under /athlete, so it does not go through request().
+function activityFields(summary = {}) {
+    const out = {};
+    if(summary.name) out.name = summary.name;
+    if(summary.rpe >= 1 && summary.rpe <= 10) out.icu_rpe = summary.rpe;
+    if(summary.feel >= 1 && summary.feel <= 5) out.feel = summary.feel;
+    if(typeof summary.notes === 'string' && summary.notes.trim()) out.description = summary.notes.trim();
+    return out;
+}
+
+async function updateActivity(id, fields = {}) {
+    const {key} = load();
+    if(!key) throw new IntervalsError(0, 'no intervals.icu API key set');
+    if(!id || !Object.keys(fields).length) return null;
+    const response = await fetch(`${base}/activity/${encodeURIComponent(id)}`, {
+        method: 'PUT',
+        headers: {'Authorization': authHeader(key), 'Content-Type': 'application/json'},
+        body: JSON.stringify(fields),
+    });
+    if(!response.ok) throw new IntervalsError(response.status, `intervals.icu answered ${response.status}`);
+    return response.json().catch(() => null);
+}
+
 export default Object.freeze({
+    uploadedId,
+    activityFields,
+    updateActivity,
     load,
     save,
     clear,

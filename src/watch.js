@@ -93,6 +93,8 @@ class Watch {
         xf.sub('ui:watchResume',  e => { self.resume();         });
         xf.sub('ui:watchLap',     e => { self.lap();            });
         xf.sub('ui:watchBack',    e => { self.back();           });
+        // the pause screen's End workout, which asks for itself
+        xf.sub('ui:watchEnd',     e => { self.stop();           });
         xf.sub('ui:watchStop',    e => {
             const stop = confirm('Confirm Stop?');
             if(stop) {
@@ -272,6 +274,9 @@ class Watch {
         const self = this;
         if(self.isStarted() || self.isPaused()) {
             timer.postMessage('stop');
+            // spinning on after the end never starts a new ride over the end screen
+            self.autoStartCounter = -1;
+            xf.dispatch(`ui:autoStartCounter`, -1);
 
             xf.dispatch('watch:event', {
                 timestamp: Date.now(),
