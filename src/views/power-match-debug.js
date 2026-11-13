@@ -197,6 +197,7 @@ class PowerMatchDebug extends HTMLElement {
             ['avg trn', n(r.emaTrainer, 1),          'avg ped', n(r.emaMeter, 1)],
             ['paired',  `${n(r.paired)}s`,           'ped-tgt', `<span class="${errClass}">${exists(meterErr) ? (meterErr >= 0 ? '+' : '') + n(meterErr) : '--'}</span>`],
             ['sample',  ago(r.t, now),               'sent at', ago(this.lastSend, now)],
+            ['steady',  exists(r.steady) ? `${r.steady}s` : '--', 'calm', exists(r.calm) ? `${Math.round(r.calm * 100)}%` : '--'],
         ];
 
         this.$grid.innerHTML = cells.map(([k1, v1, k2, v2]) =>

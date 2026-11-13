@@ -30,7 +30,44 @@ const defaults = {
     maxRatio:     1.2,    // not something to chase
     resendEvery:  3000,   // ms, at most one correction per this interval
     resendDelta:  2,      // W, smallest correction worth sending
+
+    // Settling (rider, Nov 13, 2026): "the longer we're in a steady interval,
+    // the more we should back off power match so that it doesn't respond as
+    // quickly ... it's okay to go a little bit off if we know that I'll
+    // eventually get back to it." From settleAfter to settleFull seconds into
+    // one target, the three knobs above ease out to their calm values:
+    settleAfter:  60,     // s at one target before anything eases
+    settleFull:   600,    // s at one target when it is fully calm
+    calmTau:      120,    // s, the averages' time constant when calm
+    calmEvery:    30000,  // ms between corrections when calm
+    calmDeltaPct: 2,      // % of the target a correction must be worth when calm
+    slowLane:     3,      // a smaller one (still >= resendDelta) waits this many
+                          // times as long, so a small gap is closed eventually
 };
+
+const lerp = (a, b, k) => a + (b - a) * k;
+
+// How calm the correction is after `steadyS` seconds at one target: 0 at the
+// start of an interval (react fast, so a new interval lands), 1 when settled.
+function settle(steadyS, target, args = {}) {
+    const c = Object.assign({}, defaults, args);
+    const k = Math.min(1, Math.max(0, (steadyS - c.settleAfter) / (c.settleFull - c.settleAfter)));
+    return {
+        k,
+        tau:   lerp(c.tau, c.calmTau, k),
+        every: lerp(c.resendEvery, c.calmEvery, k),
+        delta: Math.max(c.resendDelta, lerp(c.resendDelta, (c.calmDeltaPct / 100) * (target || 0), k)),
+        slow:  lerp(c.resendEvery, c.calmEvery * c.slowLane, k),
+    };
+}
+
+// Whether a correction of `gap` W goes out `sinceMs` after the last one.
+function shouldCorrect(gap, sinceMs, s, args = {}) {
+    const c = Object.assign({}, defaults, args);
+    const g = Math.abs(gap);
+    if(g >= s.delta && sinceMs >= s.every) return true;
+    return g >= c.resendDelta && sinceMs >= s.slow;
+}
 
 // The calibration itself, with no I/O, so it can be tested on its own.
 function PowerMatchCore(args = {}) {
@@ -56,7 +93,7 @@ function PowerMatchCore(args = {}) {
 
     // the meter drives the clock: each meter sample is paired with the
     // latest trainer sample
-    function onMeter(power, t) {
+    function onMeter(power, t, tau = c.tau) {
         if(!exists(trainer)) return;
         if((t - trainer.t) > c.maxAge) return;
         if(power < c.minPower || trainer.power < c.minPower) {
@@ -76,7 +113,7 @@ function PowerMatchCore(args = {}) {
         lastT = t;
         if(dt <= 0) return;
 
-        const alpha = 1 - Math.exp(-dt / c.tau);
+        const alpha = 1 - Math.exp(-dt / tau);
         emaMeter   += alpha * (power - emaMeter);
         emaTrainer += alpha * (trainer.power - emaTrainer);
         paired     += dt;
@@ -152,6 +189,7 @@ function PowerMatch(args = {}) {
     let target   = 0;
     let lastSent;
     let lastSentT = 0;
+    let targetSince = now();  // when the target last changed
     let meterPower;
     let sim;              // {offset, power, timer}
     const log = [];
@@ -182,6 +220,8 @@ function PowerMatch(args = {}) {
             emaTrainer: st.emaTrainer,
             emaMeter:   st.emaMeter,
             source:     sources.power,
+            steady:     Math.round((now() - targetSince) / 1000),
+            calm:       calm().k,
         };
     }
 
@@ -225,7 +265,12 @@ function PowerMatch(args = {}) {
         updateEnabled();
     }
 
+    function calm() {
+        return settle((now() - targetSince) / 1000, target, args);
+    }
+
     function onPowerTarget(value) {
+        if(value !== target) targetSince = now();
         target = value;
         send('target');
     }
@@ -236,12 +281,12 @@ function PowerMatch(args = {}) {
 
     function onMeterPower(power) {
         meterPower = power;
-        core.onMeter(power, now());
+        const c = calm();
+        core.onMeter(power, now(), c.tau);
 
         if(enabled && target > 0 && core.isReady()) {
             const value = core.adjust(target);
-            if(Math.abs(value - (lastSent ?? target)) >= core.config.resendDelta &&
-               (now() - lastSentT) >= core.config.resendEvery) {
+            if(shouldCorrect(value - (lastSent ?? target), now() - lastSentT, c, args)) {
                 send('correct');
                 return;
             }
@@ -303,6 +348,7 @@ function PowerMatch(args = {}) {
     const columns = [
         't', 'time', 'event', 'enabled', 'sim', 'ready', 'paired', 'ratio',
         'target', 'sent', 'trainer', 'meter', 'emaTrainer', 'emaMeter', 'source',
+        'steady', 'calm',
     ];
 
     function fmt(value) {
@@ -385,4 +431,6 @@ export default powerMatch;
 export {
     PowerMatchCore,
     PowerMatch,
+    settle,
+    shouldCorrect,
 };

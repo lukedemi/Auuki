@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 import { xf } from '../src/functions.js';
-import { PowerMatchCore, PowerMatch } from '../src/power-match.js';
+import { PowerMatchCore, PowerMatch, settle, shouldCorrect } from '../src/power-match.js';
 
 // feed paired 1 Hz samples: trainer and meter each second
 function ride(core, {seconds, trainer, meter, t0 = 0}) {
@@ -171,7 +171,7 @@ describe('PowerMatch wiring', () => {
         expect(log.some(r => r.event === 'target')).toBe(true);
 
         const lines = pm.csv().trim().split('\n');
-        expect(lines[0]).toBe('t,time,event,enabled,sim,ready,paired,ratio,target,sent,trainer,meter,emaTrainer,emaMeter,source');
+        expect(lines[0]).toBe('t,time,event,enabled,sim,ready,paired,ratio,target,sent,trainer,meter,emaTrainer,emaMeter,source,steady,calm');
         expect(lines.length).toBe(log.length + 1);
 
         pm.clear();
@@ -231,5 +231,95 @@ describe('PowerMatch simulation', () => {
         pm.simulate(false);
         expect(pm.isSimulating()).toBe(false);
         expect(pm.trainerTarget()).toBe(250);
+    });
+});
+
+
+describe('settling into a long interval', () => {
+    test('fast for the first minute, calm by ten, in between on the way', () => {
+        const start = settle(10, 286);
+        expect(start).toMatchObject({k: 0, tau: 20, every: 3000, delta: 2});
+        const mid = settle(330, 286);
+        expect(mid.k).toBeCloseTo(0.5, 5);
+        expect(mid.tau).toBeCloseTo(70, 5);
+        const calm = settle(1800, 286);
+        expect(calm).toMatchObject({k: 1, tau: 120, every: 30000});
+        expect(calm.delta).toBeCloseTo(5.72, 2);
+        expect(calm.slow).toBe(90000);
+    });
+
+    test('a calm interval lets a small gap wait, a big one less, and closes both eventually', () => {
+        const calm = settle(1800, 286);
+        expect(shouldCorrect(4, 10000, calm)).toBe(false);   // small, recent
+        expect(shouldCorrect(4, 60000, calm)).toBe(false);   // small, still in the slow lane
+        expect(shouldCorrect(4, 90000, calm)).toBe(true);    // small, eventually
+        expect(shouldCorrect(8, 20000, calm)).toBe(false);   // big, not yet
+        expect(shouldCorrect(8, 30000, calm)).toBe(true);    // big, after the calm interval
+        expect(shouldCorrect(1, 600000, calm)).toBe(false);  // under 2 W never goes
+        const start = settle(0, 286);
+        expect(shouldCorrect(3, 3000, start)).toBe(true);    // a fresh interval reacts as before
+    });
+});
+
+describe('PowerMatch settling, wired', () => {
+    let pm, clock, sent, abort;
+
+    beforeEach(() => {
+        clock = 0;
+        sent = [];
+        abort = new AbortController();
+        pm = PowerMatch({now: () => clock});
+        pm.start();
+        xf.sub('trainer:powerTarget', v => sent.push([clock, v]), {signal: abort.signal});
+    });
+
+    afterEach(() => { pm.stop(); abort.abort(); });
+
+    function tick(seconds, trainer, meter) {
+        for(let i = 0; i < seconds; i++) {
+            clock += 1000;
+            xf.dispatch('ble:controllable:power', typeof trainer === 'function' ? trainer() : trainer);
+            xf.dispatch('ble:powerMeter:power', typeof meter === 'function' ? meter() : meter);
+        }
+    }
+
+    // `before` seconds at one target with the pedals 2% low, then the pedals
+    // drift to 5% low for five minutes: the corrections sent in the drift
+    function drift(before) {
+        xf.dispatch('db:sources', {sources: {power: 'ble:powerMeter'}});
+        xf.dispatch('db:powerTarget', {powerTarget: 286});
+        tick(before, 286, 280);
+        const from = sent.length, t0 = clock;
+        let reached = null;
+        for(let i = 0; i < 300; i++) {
+            tick(1, 286, 286 * 0.95);
+            const lastSent = sent.length ? sent[sent.length - 1][1] : 0;
+            if(reached == null && sent.length > from && lastSent >= 298) reached = (clock - t0) / 1000;
+        }
+        const corrections = sent.slice(from);
+        return {corrections, target: corrections.length ? corrections[corrections.length - 1][1] : null, reached};
+    }
+
+    test('fifteen minutes into an interval, a drift is corrected calmly and still closed', () => {
+        const late = drift(900);
+        expect(late.corrections.length).toBeGreaterThan(0);
+        const gaps = late.corrections.slice(1).map((c, i) => c[0] - late.corrections[i][0]);
+        gaps.forEach(g => expect(g).toBeGreaterThanOrEqual(30000));
+        expect(late.target).toBeGreaterThanOrEqual(298);   // 286 / 0.95 = 301, most of the way there
+        expect(late.reached).toBeGreaterThan(120);         // and it took its time: the trainer is not chased
+    });
+
+    test('twenty seconds into an interval, the same drift is chased quickly', () => {
+        const early = drift(20);
+        expect(early.corrections[1][0] - early.corrections[0][0]).toBeLessThan(10000);
+        expect(early.reached).toBeLessThan(60);         // what the trainer was sent, within a minute
+    });
+
+    test('the debug snapshot says how long the target has held and how calm it is', () => {
+        xf.dispatch('db:powerTarget', {powerTarget: 200});
+        clock += 330000;
+        const s = pm.snapshot();
+        expect(s.steady).toBe(330);
+        expect(s.calm).toBeCloseTo(0.5, 5);
     });
 });
