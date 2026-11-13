@@ -3735,6 +3735,45 @@ and (min-width: 1900px) {
 /* END Media Queries */
 
 
+/* ERG only unless Settings > Resistance & Slope is on (this fork) */
+html.erg-only .tab-btn-group {
+    display: none;
+}
+
+/* the ERG target and the Workout % side by side, the same size */
+#erg-mode-controls.active {
+    display: flex;
+    gap: 1em;
+    justify-content: center;
+    align-items: flex-end;
+}
+#erg-mode-controls power-target-control,
+#erg-mode-controls intensity-control {
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: 22em;
+}
+.target-control--label {
+    font-size: 0.95em;
+    text-transform: uppercase;
+    opacity: 0.7;
+    margin: 0 0 0.3em;
+    text-align: center;
+}
+.intensity--reset {
+    font: inherit;
+    color: var(--zone-yellow);
+    background: none;
+    border: none;
+    text-decoration: underline;
+    cursor: pointer;
+    text-transform: none;
+}
+intensity-control.changed .number-input--value {
+    outline: 3px solid var(--zone-yellow);
+    outline-offset: -3px;
+}
+
 /* the Lap section (this fork): shown by the desktop layout below */
 .lap-section {
     display: none;
@@ -3768,8 +3807,8 @@ and (orientation: landscape) {
 
     .data-tiles {
         grid-area: 2 / 1 / 5 / 2;
-        grid-template-columns: repeat(6, 1fr);
-        grid-template-rows: 1.4fr 1fr 0.9fr 2.3fr;
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        grid-template-rows: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 0.9fr) minmax(0, 2.3fr);
         font-size: clamp(1.1rem, 1.25vw, 1.9rem);
         --data-tile--value-font-size: 3.4em;
         --data-tile-small--value-font-size: 2.1em;
@@ -3785,6 +3824,48 @@ and (orientation: landscape) {
     .data-tiles > * {
         text-align: center;
     }
+    /* every tile fills its cell; views/fit-text.js sizes the number to it */
+    .data-tiles > .data-tile,
+    .data-tiles > .data-tile--small {
+        align-self: stretch;
+        justify-self: stretch;
+        min-height: 0;
+        min-width: 0;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+    }
+    .data-tiles z-stack,
+    .data-tiles z-stack-item.active {
+        width: 100%;
+    }
+    .data-tile--value,
+    .data-tile-small--value,
+    .lap-tile--value {
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+        line-height: 1em;
+    }
+    .data-tile--heading,
+    .data-tile-small--heading {
+        margin: 0 auto 0.2em;
+    }
+    html.erg-only .targets--cont {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    /* one face for every number, so the same size reads the same */
+    .data-tile-small--value,
+    .lap-tile--value {
+        font-family: var(--ssb-font-family);
+    }
+    /* the .active rules elsewhere make these block: centre them like the rest */
+    #data-tile--speed.active,
+    #data-tile--distance.active,
+    #data-tile--slope.active {
+        display: flex;
+    }
 
     /* rider, Nov 13, 2026: heart rate beside the power, the ride's clocks
        together, kJ in place of slope, and everything about this interval
@@ -3792,10 +3873,10 @@ and (orientation: landscape) {
     #data-tile--power         { grid-area: 1 / 1 / 2 / 4; }
     #data-tile--heart-rate    { grid-area: 1 / 4 / 2 / 7; }
     #data-tile--cadence       { grid-area: 2 / 1 / 3 / 4; }
-    #data-tile--slope         { grid-area: 2 / 4 / 3 / 7; display: block; }   /* Work kJ */
+    #data-tile--slope         { grid-area: 2 / 4 / 3 / 7; display: flex; }   /* Work kJ */
     #data-tile--elapsed-time  { grid-area: 3 / 1 / 4 / 3; }
-    #data-tile--speed         { grid-area: 3 / 3 / 4 / 5; display: block; }   /* Time Left */
-    #data-tile--distance      { grid-area: 3 / 5 / 4 / 7; display: block; }   /* Finish */
+    #data-tile--speed         { grid-area: 3 / 3 / 4 / 5; display: flex; }   /* Time Left */
+    #data-tile--distance      { grid-area: 3 / 5 / 4 / 7; display: flex; }   /* Finish */
     #lap-section              { grid-area: 4 / 1 / 5 / 7; }
 
     /* in the Lap section now */
@@ -3807,8 +3888,9 @@ and (orientation: landscape) {
 
     .lap-section {
         display: grid;
-        grid-template-columns: 1fr 1fr;
-        grid-template-rows: auto 1.25fr 1fr;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        grid-template-rows: auto minmax(0, 1.3fr) minmax(0, 1fr);
+        min-height: 0;
         align-items: center;
         justify-items: center;
         align-self: stretch;
@@ -3830,6 +3912,15 @@ and (orientation: landscape) {
     }
     .lap-tile {
         text-align: center;
+        align-self: stretch;
+        justify-self: stretch;
+        min-height: 0;
+        min-width: 0;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
     }
     .lap-tile--heading {
         font-size: 0.75em;

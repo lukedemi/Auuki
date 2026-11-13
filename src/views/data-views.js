@@ -431,7 +431,8 @@ class HeartRateValue extends DataView {
         };
     }
     transform(state) {
-        this.style = 'color: #FE340B';
+        // only the colour: assigning the whole style wiped the size fit-text.js sets
+        this.style.color = '#FE340B';
         return Math.round(state);
     }
 }
@@ -814,27 +815,35 @@ customElements.define('power-target-control', PowerTargetControl);
 // The workout's intensity, under the ERG target: − 100% +, 1% a press;
 // a press on the number puts it back to 100 (db.js setIntensity)
 class IntensityControl extends HTMLElement {
+    // built like the power target beside it (rider, Nov 13, 2026: "make
+    // sure the percentage gain and the workout power are the same size"):
+    // the same buttons, the same input, typed values accepted
     connectedCallback() {
         this.abortController = new AbortController();
         const signal = { signal: this.abortController.signal };
         this.innerHTML = `
-            <div class="intensity--row" style="display:flex;align-items:center;justify-content:center;gap:0.5em;margin-top:0.4em;font-size:0.95em">
-                <span style="opacity:0.7">Workout</span>
-                <button type="button" class="btn" data-act="dec" aria-label="Workout intensity down" style="width:3em;height:1.9em;flex:none;font-size:1.05em">−</button>
-                <button type="button" class="intensity--value" data-act="reset" title="Back to 100%"
-                        style="min-width:3.6em;font:inherit;font-size:1.1em;font-weight:700;color:inherit;background:transparent;border:none;font-variant-numeric:tabular-nums">100%</button>
-                <button type="button" class="btn" data-act="inc" aria-label="Workout intensity up" style="width:3em;height:1.9em;flex:none;font-size:1.05em">+</button>
+            <div class="target-control--label">Workout % <button type="button" class="intensity--reset" data-act="reset" hidden>reset</button></div>
+            <div class="number-input">
+                <button type="button" class="number-input--dec number-input--btn btn" data-act="dec" aria-label="Workout intensity down">-</button>
+                <input class="number-input--value intensity--input" type="number" min="50" max="150" step="1" value="100" autocomplete="off" aria-label="Workout intensity, percent"/>
+                <button type="button" class="number-input--inc number-input--btn btn" data-act="inc" aria-label="Workout intensity up">+</button>
             </div>`;
-        this.$value = this.querySelector('.intensity--value');
+        this.$input = this.querySelector('.intensity--input');
+        this.$reset = this.querySelector('.intensity--reset');
         this.addEventListener('pointerup', (e) => {
             const act = e.target?.closest('[data-act]')?.dataset?.act;
             if(act === 'inc') xf.dispatch('ui:intensity-inc');
             if(act === 'dec') xf.dispatch('ui:intensity-dec');
             if(act === 'reset') xf.dispatch('ui:intensity-set', 100);
         }, signal);
+        this.$input.addEventListener('change', () => {
+            const v = parseInt(this.$input.value);
+            if(Number.isFinite(v)) xf.dispatch('ui:intensity-set', v);
+        }, signal);
         xf.sub('db:intensity', (v) => {
-            this.$value.textContent = `${v}%`;
-            this.$value.style.color = v === 100 ? '' : 'var(--zone-yellow)';
+            this.$input.value = v;
+            this.classList.toggle('changed', v !== 100);
+            this.$reset.hidden = v === 100;
         }, signal);
     }
     disconnectedCallback() {
@@ -1816,6 +1825,26 @@ class ReconnectDevicesSetting extends AutoPause {
 }
 
 customElements.define('reconnect-devices-setting', ReconnectDevicesSetting);
+
+// Settings > Resistance & Slope: off by default (rider, Nov 13, 2026: "I
+// will never use resistance or slope mode"). Off, the mode buttons are
+// hidden and the panel is the ERG target and Workout % alone.
+class ExtraModesSetting extends AutoPause {
+    postInit() {
+        this.effect  = 'sources';
+        this.key     = 'extraModes';
+        this.state   = false;
+        this.values  = {on: {extraModes: true}, off: {extraModes: false}};
+        document.documentElement.classList.add('erg-only');
+    }
+    onUpdate(value) {
+        this.state = value[this.key] ?? false;
+        document.documentElement.classList.toggle('erg-only', !this.state);
+        this.render();
+    }
+}
+
+customElements.define('extra-modes-setting', ExtraModesSetting);
 
 // Settings > Send Debug Traces (trace.js)
 class TracesSetting extends AutoPause {
