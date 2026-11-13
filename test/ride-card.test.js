@@ -3,7 +3,7 @@
  */
 
 import { fit } from '../src/fit/fit.js';
-import { cleanTitle, cardModel, cardSvg, chartFromFit, fileName, funLines } from '../src/ride-card.js';
+import { cleanTitle, cardModel, cardSvg, chartFromFit, fileName, extras } from '../src/ride-card.js';
 
 // 10 min at 150, then 3 x (4 min at 260, 2 min at 150), 5 min at 120; FTP 250
 function ride() {
@@ -125,26 +125,30 @@ describe('ride card', () => {
         expect(fileName(new Date(2026, 10, 13, 12).getTime())).toBe('ride-2026-11-13.png');
     });
 
-    test('the extra lines: only what the ride carries', () => {
+    test('the extras are lines on the chart, only what the ride carries', () => {
         const c = ride();
-        expect(funLines(c)).toEqual([]);
-        c.cad = c.w.map(() => 90);
-        c.bal = c.w.map((w, i) => (i < 600 ? 46 : 50));
+        expect(extras(c)).toEqual({temp: [], co2: [], cad: [], fan: []});
+        let svg = cardSvg(cardModel(c));
+        expect(svg).not.toContain('room °F');
+
+        c.cad = c.w.map((w, i) => (i >= 1200 && i < 1260 ? 0 : 90));     // a minute stopped
         c.room = [
             {t: 0, temp: 62.4, hum: 50, co2: 660, front: 0, rear: 0},
+            {t: 600, temp: 63.0, hum: 51, co2: 820, front: 1, rear: 0},
             {t: 1200, temp: 64.0, hum: 53, co2: 1180, front: 1, rear: 0},
-            {t: 1980, temp: 65.1, hum: 55, co2: 1120, front: 1, rear: 0},
+            {t: 1800, temp: 65.1, hum: 55, co2: 1120, front: 0, rear: 0},
         ];
-        c.extended = [{iv: 7, added: 600, last: true}, {iv: 2, added: 300, last: false}];
-        expect(funLines(c)).toEqual([
-            'Room 62.4 → 65.1°F · 50 → 55% · CO₂ 660 → 1,120 ppm (max 1,180) · fans: front 13 min',
-            '90 rpm · L/R 49/51 · cool-down +10 min · interval 3 +5 min',
-        ]);
-        // fans that never ran are not worth a mention on the image
-        c.room.forEach((r) => r.front = 0);
-        expect(funLines(c)[0]).toBe('Room 62.4 → 65.1°F · 50 → 55% · CO₂ 660 → 1,120 ppm (max 1,180)');
-        const svg = cardSvg(cardModel(c));
-        expect(svg).toContain('90 rpm · L/R 49/51');
-        expect(svg).toContain('CO₂ 660 → 1,120 ppm');
+        const e = extras(c);
+        expect(e.temp).toEqual([[0, 62.4], [600, 63.0], [1200, 64.0], [1800, 65.1]]);
+        expect(e.co2.map((p) => p[1])).toEqual([660, 820, 1180, 1120]);
+        expect(e.fan).toEqual([{s0: 600, s1: 1800}]);
+        expect(e.cad.length).toBe(Math.ceil(c.t.length / 60));
+        expect(e.cad.filter((p) => p[1] === null).length).toBe(1);   // the stop breaks the line
+
+        svg = cardSvg(cardModel(c));
+        const doc = new DOMParser().parseFromString(svg, 'image/svg+xml');
+        expect(doc.getElementsByTagName('parsererror').length).toBe(0);
+        for(const s of ['room °F', 'CO₂', 'cadence', 'fan on', '65.1°F', '1,120 ppm', '90 rpm']) expect(svg).toContain(s);
+        expect(svg).toContain('stroke="#4dd0e1"');
     });
 });
