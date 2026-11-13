@@ -9,6 +9,7 @@ const timer = new Worker(new URL('./timer.js', import.meta.url));
 
 const AUTO_PAUSE_W = 20;   // under this is stopped
 const AUTO_PAUSE_S = 3;    // for this many seconds
+const RESUME_AFTER_S = 5;  // pedalling this long ends a manual pause
 
 class Watch {
     constructor(args) {
@@ -133,6 +134,25 @@ class Watch {
 
             if(power > 40 && this.hasBeenAutoPaused) {
                 xf.dispatch(`ui:watchResume`);
+            }
+
+            // Pedalling through a pause you set yourself (or one a reload
+            // left): resume after a few seconds of it, counted down on the
+            // pause banner (this fork, Nov 13, 2026, rider: "you can sit there
+            // grinding for way too long"). Auto-pauses still resume at once.
+            if(this.isPaused() && !this.hasBeenAutoPaused) {
+                if(power > 40) {
+                    this.pausedPedalling = (this.pausedPedalling ?? 0) + 1;
+                    const left = RESUME_AFTER_S - this.pausedPedalling;
+                    xf.dispatch('watch:resume-countdown', Math.max(0, left));
+                    if(left <= 0) {
+                        this.pausedPedalling = 0;
+                        xf.dispatch(`ui:watchResume`);
+                    }
+                } else if(this.pausedPedalling) {
+                    this.pausedPedalling = 0;
+                    xf.dispatch('watch:resume-countdown', null);
+                }
             }
         }
 
