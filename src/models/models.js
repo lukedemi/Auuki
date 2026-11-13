@@ -643,6 +643,14 @@ class Activity extends Model {
         xf.dispatch('activity:add', summary);
         return summary;
     }
+    planWatts(samples, workout, ftp) {
+        const intervals = workout?.intervals ?? [];
+        return samples.map((r) => {
+            if(!(r.iv >= 0) || !(r.st >= 0)) return 0;
+            const p = intervals[r.iv]?.steps?.[r.st]?.power;
+            return exists(p) && ftp ? models.ftp.toAbsolute(p, ftp) : 0;
+        });
+    }
     async get(id) {
         const record = await idb.get('activity', id);
         return record?.id ? record : null;
@@ -680,6 +688,8 @@ class Activity extends Model {
                 w:      samples.map((r) => Math.round(r.w || 0)),
                 hr:     samples.map((r) => Math.round(r.hr || 0)),
                 target: samples.map((r) => Math.round(r.target || 0)),
+                // what the workout said that second, as written, at this FTP: the image's blocks
+                plan: this.planWatts(samples, db.workout, db.ftp),
                 // the trainer room once a minute, from Home Assistant (room.js), when it was reachable
                 room: room.log(),
             };

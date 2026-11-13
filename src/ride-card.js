@@ -22,6 +22,7 @@ import { fit } from './fit/fit.js';
 import { normalizedPower } from './views/time-left.js';
 
 const W = 1600, H = 1000;
+export const BRAND = 'Auuki', BRAND_SUB = '(lukedemi fork)';
 const L = 70, R = 40, T = 215, B = 950;
 const PW = W - L - R, PH = B - T;
 
@@ -57,8 +58,26 @@ function smooth(values, n) {
 
 // A saved activity's `chart` (models.js Activity.chart): one value a second
 // in parallel arrays t, w, hr, target, and the ride's FTP.
+// `target` is what the blocks are drawn from: the plan as written when the
+// ride kept one (what he was supposed to do), else the target that was set.
+// `set` is the target that was set, for the dashed line where it differs.
 function rowsOfChart(chart) {
-    return (chart.t ?? []).map((t, i) => ({t, w: chart.w[i] ?? 0, hr: chart.hr[i] ?? 0, target: chart.target[i] ?? 0}));
+    const plan = Array.isArray(chart.plan) && chart.plan.some((v) => v > 0) ? chart.plan : null;
+    const set = chart.target ?? [];
+    return (chart.t ?? []).map((t, i) => ({t, w: chart.w[i] ?? 0, hr: chart.hr[i] ?? 0,
+        target: (plan ? plan[i] : set[i]) ?? 0, set: set[i] ?? 0}));
+}
+
+// the stretches where the target set (Workout %, a nudge) was not the plan's
+function offPlan(rows) {
+    const out = [];
+    for(const r of rows) {
+        const off = r.target > 0 && r.set > 0 && Math.abs(r.set - r.target) > Math.max(3, 0.02 * r.target);
+        const last = out[out.length - 1];
+        if(off && last && last.s1 === r.t - 1 && last.w === r.set) last.s1 = r.t;
+        else if(off) out.push({s0: r.t - 1, s1: r.t, w: r.set});
+    }
+    return out.filter((r) => r.s1 - r.s0 >= 10);
 }
 
 // The workout's target for each second of a lap: interval k's steps, in
@@ -103,6 +122,7 @@ export function chartFromFit(view, {name = '', workout = null, toAbsolute = null
         w:      records.map((r) => r.power ?? 0),
         hr:     records.map((r) => r.heart_rate ?? 0),
         target,
+        plan: target.slice(),
     };
 }
 
@@ -146,6 +166,7 @@ export function cardModel(chart, {name = ''} = {}) {
     const rs = runs(rows);
 
     const blocks = rs.filter((r) => r.target > 0).map((r) => ({s0: r.s0, s1: r.s1, lo: r.target, hi: r.target}));
+    const set = offPlan(rows);
     const labels = ftp ? reps(rs.filter((r) => r.target > 0), ftp).map((r, n) => ({
         s0: r.s0, s1: r.s1, target: r.target, n: n + 1,
         w:  Math.round(mean(r.rows.map((x) => x.w))),
@@ -176,7 +197,7 @@ export function cardModel(chart, {name = ''} = {}) {
         [hrs.length ? String(Math.round(mean(hrs))) : '—', 'avg bpm'],
     ];
 
-    return {v: 1, title: cleanTitle(name) || 'Ride', ftp: ftp || 300, end, step, pts, blocks, free: [], labels, stats};
+    return {v: 1, title: cleanTitle(name) || 'Ride', ftp: ftp || 300, end, step, pts, blocks, set, free: [], labels, stats};
 }
 
 // ---------------------------------------------------------------- the picture
@@ -197,9 +218,8 @@ export function cardSvg(m) {
     out.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="-apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif">`);
     out.push(`<rect width="${W}" height="${H}" fill="#14161b"/>`);
 
-    const t = m.title || 'Ride';
-    const size = Math.max(30, Math.min(50, Math.floor((W - L - R) / (0.56 * Math.max(1, Array.from(t).length)))));
-    out.push(`<text x="${L}" y="92" fill="#fff" font-size="${size}" font-weight="700">${escXml(t)}</text>`);
+    // the app, where the ride's title was (rider, Nov 13, 2026: "Instead of the title have it say Auuki (lukedemi fork)")
+    out.push(`<text x="${L}" y="92" fill="#fff" font-size="46" font-weight="700">${escXml(BRAND)}<tspan fill="#7d8390" font-weight="500" font-size="32"> ${escXml(BRAND_SUB)}</tspan></text>`);
     m.stats.forEach(([v, lab], k) => {
         const sx = L + k * 245;
         out.push(`<text x="${sx}" y="162" fill="#fff" font-size="38" font-weight="700">${escXml(v)}</text>`);
@@ -216,6 +236,11 @@ export function cardSvg(m) {
     for(const b of m.blocks) {
         const c = zoneColour(100 * Math.max(b.lo, b.hi) / ftp);
         out.push(`<rect x="${f(x(b.s0))}" y="${f(y(b.lo))}" width="${f(Math.max(0.5, x(b.s1) - x(b.s0)))}" height="${f(B - y(b.lo))}" fill="${c}" opacity="0.55"/>`);
+    }
+
+    // where the target set was not the plan's (Workout %, a nudge): dashed, over the block
+    for(const r of m.set ?? []) {
+        out.push(`<line x1="${f(x(r.s0))}" x2="${f(x(r.s1))}" y1="${f(y(r.w))}" y2="${f(y(r.w))}" stroke="#ffffff" stroke-width="2" stroke-dasharray="8 6" opacity="0.7"/>`);
     }
 
     if(m.pts.length > 1) {
@@ -244,7 +269,8 @@ export function cardSvg(m) {
     }
     // the legend, inside the plot's bottom-left corner on a dark plate
     const items = [];
-    if(m.blocks.length) items.push([`<rect x="0" y="-13" width="24" height="14" fill="#f2c94c" opacity="0.55"/>`, 'target', 116]);
+    if(m.blocks.length) items.push([`<rect x="0" y="-13" width="24" height="14" fill="#f2c94c" opacity="0.55"/>`, 'plan', 100]);
+    if(m.set?.length) items.push([`<line x1="0" x2="26" y1="-6" y2="-6" stroke="#fff" stroke-width="2" stroke-dasharray="6 4" opacity="0.8"/>`, 'target set', 140]);
     items.push([`<line x1="0" x2="26" y1="-6" y2="-6" stroke="#f4f6fa" stroke-width="3"/>`, 'power', 112]);
     items.push([`<line x1="0" x2="26" y1="-6" y2="-6" stroke="#ff6b6b" stroke-width="3"/>`, 'heart rate', 128]);
     const plateW = items.reduce((a, it) => a + it[2], 0) + 16;

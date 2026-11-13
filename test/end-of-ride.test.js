@@ -11,7 +11,7 @@ import { idb } from '../src/storage/idb.js';
 import { models } from '../src/models/models.js';
 import direct from '../src/models/intervals-direct.js';
 import '../src/views/pause-overlay.js';
-import '../src/views/ride-summary.js';
+import { plannedWorkoutFor } from '../src/views/ride-summary.js';
 
 const start = Date.UTC(2026, 10, 13, 16, 0, 0);
 function rideDb(n, name = '📊 Capped sub-threshold — 5x8min') {
@@ -136,5 +136,25 @@ describe('the end screen', () => {
         expect(await waitFor(() => el.classList.contains('open') && el.querySelector('.rs--name')?.value === 'Sub-threshold, done')).toBe(true);
         expect(el.querySelector('[data-rpe="6"]').classList.contains('on')).toBe(true);
         el.remove();
+    });
+});
+
+describe('an older ride finds the workout it followed', () => {
+    const summary = {name: '📊 Capped sub-threshold — 5x8min ≤ 3.0 mmol', timestamp: new Date(2026, 10, 13, 11, 13).getTime()};
+    const loaded = (name) => ({meta: {name}, intervals: [{duration: 60, steps: [{duration: 60, power: 0.8}]}]});
+    test('the loaded workout, when the names match', async () => {
+        const w = loaded('📊 Capped sub-threshold — something else');
+        expect(await plannedWorkoutFor(summary, {loaded: w})).toBe(w);
+    });
+    test('else that day\'s planned workout of the same name on intervals.icu', async () => {
+        localStorage.setItem('intervals-direct', JSON.stringify({athlete: '0', key: 'k'}));
+        const asked = [];
+        const events = async (a, b) => { asked.push([a, b]); return [{name: 'Z2 2.5hr'}, {name: '📊 Capped sub-threshold — 5x8min ≤ 3.0 mmol', id: 7}]; };
+        const w = await plannedWorkoutFor(summary, {loaded: loaded('Z2 2.5hr'), events, fromEvent: (e) => ({meta: {}, intervals: [], from: e.id})});
+        expect(asked).toEqual([['2026-11-13', '2026-11-13']]);
+        expect(w.from).toBe(7);
+        expect(w.meta.name).toBe('📊 Capped sub-threshold — 5x8min ≤ 3.0 mmol');
+        expect(await plannedWorkoutFor(summary, {loaded: null, events: async () => [{name: 'Other'}]})).toBe(null);
+        localStorage.removeItem('intervals-direct');
     });
 });

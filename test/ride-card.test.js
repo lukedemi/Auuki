@@ -60,12 +60,38 @@ describe('ride card', () => {
         expect(cardSvg(m)).toMatch(/^<svg[\s\S]*<\/svg>$/);
     });
 
-    test('the svg is well-formed XML', () => {
+    test('the svg is well-formed XML, and carries the app, not the ride\'s title', () => {
         const svg = cardSvg(cardModel(ride(), {name: 'Tom & Jerry <3'}));
         const doc = new DOMParser().parseFromString(svg, 'image/svg+xml');
         expect(doc.getElementsByTagName('parsererror').length).toBe(0);
-        expect(svg).toContain('Tom &amp; Jerry &lt;3');
+        expect(svg).not.toContain('Tom');
+        expect(svg).toContain('Auuki<tspan');
+        expect(svg).toContain('(lukedemi fork)');
         expect(svg).toContain('rep 2 · 160 bpm');
+        expect(svg).toContain('>plan<');
+        expect(svg).not.toContain('target set');
+    });
+
+    test('the blocks are the plan; a target set off it is a dashed line', () => {
+        const c = ride();
+        c.plan = c.target.slice();
+        // Workout % at 95 through the second rep (s 960 to 1200), and a 5 s nudge that is ignored
+        for(let i = 960; i < 1200; i++) c.target[i] = Math.round(c.target[i] * 0.95);
+        for(let i = 1400; i < 1405; i++) c.target[i] = c.target[i] + 20;
+        const m = cardModel(c);
+        expect(m.blocks.map((b) => b.lo)).toEqual([150, 260, 150, 260, 150, 260, 150, 120]);
+        expect(m.labels.length).toBe(3);
+        expect(m.set).toEqual([{s0: 960, s1: 1200, w: 247}]);
+        const svg = cardSvg(m);
+        expect(svg).toContain('stroke-dasharray="8 6"');
+        expect(svg).toContain('target set');
+    });
+
+    test('no plan kept: the blocks are the targets set', () => {
+        const c = ride();
+        c.plan = c.target.map(() => 0);
+        expect(cardModel(c).blocks.length).toBe(8);
+        expect(cardModel(c).set).toEqual([]);
     });
 
     test('an older ride comes back from its FIT, targets from the loaded workout by lap', () => {

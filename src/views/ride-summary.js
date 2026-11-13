@@ -18,7 +18,7 @@ import { xf } from '../functions.js';
 import { models } from '../models/models.js';
 import direct from '../models/intervals-direct.js';
 import { roomSummary } from '../room.js';
-import { recordChart, cardModel, cardSvg, svgToPng, fileName as pngName, downloadBlob } from '../ride-card.js';
+import { recordChart, cleanTitle, cardModel, cardSvg, svgToPng, fileName as pngName, downloadBlob } from '../ride-card.js';
 
 const FEEL = [[1, 'Very strong'], [2, 'Strong'], [3, 'Normal'], [4, 'Meh'], [5, 'Weak']];
 const RPE_WORDS = {1: 'very easy', 3: 'easy', 5: 'moderate', 7: 'hard', 9: 'very hard', 10: 'max'};
@@ -103,6 +103,28 @@ export function roomLine(r) {
 let loadedWorkout = null;
 xf.sub('db:workout', (w) => loadedWorkout = w);
 
+// A ride saved before rides kept their plan: the workout it followed is the
+// one still loaded if the names match, else that day's planned workout of the
+// same name on intervals.icu.
+export async function plannedWorkoutFor(summary = {}, {loaded = loadedWorkout, events = direct.events, fromEvent = (e) => models.workout.fromIntervalsEvent(e)} = {}) {
+    const want = cleanTitle(summary.name);
+    if(!want) return null;
+    if(loaded?.intervals?.length && cleanTitle(loaded.meta?.name) === want) return loaded;
+    if(!direct.isConfigured()) return null;
+    try {
+        const d = new Date(summary.timestamp ?? Date.now());
+        const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        const found = (await events(day, day)).find((e) => cleanTitle(e.name) === want);
+        if(!found) return null;
+        const workout = fromEvent(found);
+        workout.meta = Object.assign({}, workout.meta, {name: found.name});
+        return workout;
+    } catch(e) {
+        console.warn('ride summary: no planned workout from intervals.icu', e);
+        return null;
+    }
+}
+
 class RideSummary extends HTMLElement {
     connectedCallback() {
         this.abortController = new AbortController();
@@ -157,7 +179,8 @@ class RideSummary extends HTMLElement {
         this.render();
         this.classList.add('open');
         try {
-            this.chart = await recordChart(record, {workout: loadedWorkout, toAbsolute: (v, ftp) => models.ftp.toAbsolute(v, ftp)});
+            const workout = record.chart?.t?.length ? null : await plannedWorkoutFor(record.summary);
+            this.chart = await recordChart(record, {workout, toAbsolute: (v, ftp) => models.ftp.toAbsolute(v, ftp)});
         } catch(e) {
             console.warn('ride summary: no chart', e);
         }
