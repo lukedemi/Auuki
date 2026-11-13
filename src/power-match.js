@@ -199,8 +199,59 @@ function PowerMatch(args = {}) {
         return equals(sources.power, meterId) && (sources.powerMatch ?? true);
     }
 
+    // ---------------------------------------------------------------- easing
+    //
+    // Paused, the trainer holds an easy load instead of the interval's watts,
+    // and on resume it ramps back up (this fork, Nov 13, 2026, rider:
+    // "getting started after a pause is really hard. I have to really juice
+    // up the power a lot ... it should let me ease back in"). In ERG a
+    // standstill against 286 W is a wall; against 100 W it is a pedal stroke.
+    const EASE_FLOOR = args.easeFloor ?? 100;     // W while paused
+    const EASE_MS    = args.easeMs ?? 20000;      // the ramp back up
+    let watchState = 'stopped';
+    let ramp = null;                              // {from, start}
+    let rampTimer;
+
+    function eased(value) {
+        if(!(value > 0)) return value;
+        if(watchState === 'paused') return Math.min(value, EASE_FLOOR);
+        if(ramp) {
+            const k = (now() - ramp.start) / EASE_MS;
+            if(k >= 1) { ramp = null; return value; }
+            const from = Math.min(ramp.from, value);
+            return Math.round(from + (value - from) * k);
+        }
+        return value;
+    }
+
+    function onWatchStatus(state) {
+        const was = watchState;
+        watchState = state;
+        if(state === 'paused' && was !== 'paused') {
+            ramp = null;
+            send('ease:paused');
+        }
+        if(state === 'started' && was !== 'started') {
+            ramp = {from: Math.min(EASE_FLOOR, lastSent ?? EASE_FLOOR), start: now()};
+            send('ease:resume');
+            clearInterval(rampTimer);
+            rampTimer = setInterval(() => {
+                send(ramp ? 'ease' : 'ease:done');
+                if(!ramp) clearInterval(rampTimer);
+            }, args.easeTick ?? 1000);
+        }
+        if(state === 'stopped') {
+            ramp = null;
+            clearInterval(rampTimer);
+        }
+    }
+
+    function isEasing() {
+        return watchState === 'paused' || !!ramp;
+    }
+
     function trainerTarget() {
-        return enabled ? core.adjust(target) : target;
+        return eased(enabled ? core.adjust(target) : target);
     }
 
     function snapshot(event = '') {
@@ -284,7 +335,7 @@ function PowerMatch(args = {}) {
         const c = calm();
         core.onMeter(power, now(), c.tau);
 
-        if(enabled && target > 0 && core.isReady()) {
+        if(enabled && target > 0 && core.isReady() && !isEasing()) {
             const value = core.adjust(target);
             if(shouldCorrect(value - (lastSent ?? target), now() - lastSentT, c, args)) {
                 send('correct');
@@ -397,9 +448,11 @@ function PowerMatch(args = {}) {
         xf.sub(`${meterId}:power`,            onMeterPower, signal);
         xf.sub(`${meterId}:disconnected`,     onDisconnect('meter:disconnect'), signal);
         xf.sub(`${trainerId}:disconnected`,   onDisconnect('trainer:disconnect'), signal);
+        xf.sub('db:watchStatus',              onWatchStatus, signal);
     }
 
     function stop() {
+        clearInterval(rampTimer);
         simulate(false);
         abortController?.abort();
     }
@@ -409,6 +462,7 @@ function PowerMatch(args = {}) {
         stop,
         core,
         trainerTarget,
+        isEasing,
         snapshot,
         simulate,
         isSimulating,

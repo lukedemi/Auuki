@@ -9,6 +9,16 @@ Self-hosted at **auuki.d3-mi.com** (Cloudflare Pages, behind Access). Changes on
 - **Live charts**: the Graph panel on the home page is a live chart (it was the Moxy strip, a 1 px-a-second line on a 0–600 W scale, now hidden): your power over the workout's targets as zone-coloured blocks, heart rate on its own scale, over a window you tap through 2 min · 10 min · 30 min · Ride, with the window's average power and heart rate. The workout graph also draws your actual power over the planned blocks as you ride. Both read one buffer, `src/live-samples.js`: a sample a second while the timer runs.
 - **Power Match Debug**: Settings → Power Match Debug, or `?debug` in the URL, opens an overlay with both readings, the ratio, the target against what the trainer was sent, a CSV log of every sample (`csv`), and a no-hardware simulator (`sim`, with the meter/trainer ratio to fake). `window.powerMatch` in the console. `/version.json` names the deployed commit.
 
+- **A ride survives a reload**: the ride in progress is saved to IndexedDB in one-minute chunks every 15 s and on pause (upstream saved it only on page close, which a killed tab never reaches). After a reload it comes back paused, with a *Ride restored* notice and the live charts refilled; pedal or press ▶ to carry on.
+- **Devices reconnect on load**: the last trainer, power meter and heart-rate strap that connected are remembered and reconnected without the chooser (Settings → Reconnect Devices). It needs Chrome to remember Web Bluetooth permissions across reloads; the traces' `page:load` row says whether `getDevices` exists in that browser. Tapping a device while it is being waited for opens the chooser instead.
+- **Auto-pause and easing back in**: power reads 0 once the sensors go quiet for 2 s (it used to stick at the last value, on screen and in the file), and auto-pause fires after 3 s under 20 W (it needed four readings of exactly 0). Paused, the trainer holds 100 W (or the target, if lower) instead of the interval's watts, and on resume, or at the start, it ramps back to the target over 20 s.
+- **Debug traces**: every page load sends what it is doing to D1 `auuki` through `functions/api/trace.js` every 10 s (Settings → Send Debug Traces): state once a second while riding, device and watch events, power-match corrections, the console and every error. `window.trace.mark('…')` or the debug panel's **mark** button drops a marker. Read them, live with `--follow`:
+
+```bash
+node scripts/traces.mjs                          # the latest sessions
+node scripts/traces.mjs latest --kind event,error,mark --since 30m --follow
+```
+
 Deploy (from `master`, by hand — nothing deploys on merge):
 
 ```bash
@@ -17,7 +27,7 @@ npm run release
 python3 ../homeassistant/scripts/cf-pages dist --name auuki --domain auuki.d3-mi.com
 ```
 
-`release` builds `dist/` and writes `dist/version.json`; `cf-pages` puts Access (the `household` group) in front of the project before uploading and checks the gate afterwards.
+`release` builds `dist/` and writes `dist/version.json`; `cf-pages` puts Access (the `household` group) in front of the project before uploading and checks the gate afterwards. Run it from this directory: wrangler picks up `functions/` and `wrangler.toml` (the D1 binding) from the working directory. The schema is `schema.sql` (`npx wrangler d1 execute auuki --remote --file schema.sql`).
 
 ---
 

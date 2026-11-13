@@ -1,0 +1,11 @@
+# Cloudflare Pages: the built app (dist/) plus functions/ (the trace sink).
+# Deployed with homeassistant's scripts/cf-pages from this directory — see
+# README § This fork. Access (household) fronts all of it.
+name = "auuki"
+pages_build_output_dir = "dist"
+compatibility_date = "2026-11-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "auuki"
+database_id = "2bc64c33-b33e-4a39-a47e-ef1754f39ca0"

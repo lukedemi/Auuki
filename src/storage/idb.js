@@ -47,7 +47,8 @@ function IDB(args = {}) {
                 case 0: createStores(storeNames);
                 case 1: update(storeNames);
                 case 2: update(storeNames);
-                case 3: latest(storeNames);
+                case 3: update(storeNames);   // v4: 'chunks', the ride in progress
+                case 4: latest(storeNames);
                 }
             };
             openReq.onerror = function() {

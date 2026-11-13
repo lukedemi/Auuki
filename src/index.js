@@ -1,4 +1,5 @@
 import { xf } from './functions.js';
+import './trace.js';           // first, so it sees every console line
 import './db.js';
 import './views/views.js';
 import './power-match.js';
