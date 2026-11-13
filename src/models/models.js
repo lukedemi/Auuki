@@ -599,7 +599,13 @@ class Activity extends Model {
         this.capacity = 7;
     }
     defaultValue() { return []; }
-    createFromCurrent(db) {
+    // Stopping saves the ride: no save button (rider, Nov 13, 2026: "You
+    // should never have to click save though… I really want to be cautious
+    // about losing stuff"). Everything is taken from db before the first
+    // await, the write is read back before it counts, and a write that does
+    // not read back downloads the .fit on the spot and throws, which keeps
+    // the session backup (db.js only clears it on success).
+    async createFromCurrent(db) {
         const id = uuid();
         const blob = fileHandler.toBlob(this.encode(db));
         const name = db.workout?.meta?.name ?? 'Powered by Auuki workout';
@@ -618,9 +624,49 @@ class Activity extends Model {
             chart: this.chart(db),
         };
 
+        let saved = null;
+        try {
+            await idb.put('activity', record);
+            saved = await idb.get('activity', id);
+        } catch(e) {
+            console.error(':activity :save :error', e);
+        }
+        if(saved?.id !== id) {
+            try {
+                fileHandler.download()(blob, this.fileName(summary.timestamp), fileHandler.Type.OctetStream);
+            } catch(e) {}
+            throw new Error('the ride did not save to this browser, so its .fit was downloaded instead');
+        }
+
         this.add(summary, db.activity);
-        idb.put('activity', record);
         xf.dispatch('activity:add', summary);
+        return summary;
+    }
+    async get(id) {
+        const record = await idb.get('activity', id);
+        return record?.id ? record : null;
+    }
+    // what the end-of-ride screen edits: name, rpe (1-10), feel (1-5, 1 best,
+    // as intervals.icu has it), notes. Written straight to IndexedDB.
+    // Writes to a saved ride go one at a time: two quick taps (RPE, then
+    // feel) would otherwise each read the ride, and the second write would
+    // drop the first one's field.
+    serial(fn) {
+        const next = (this.writes ?? Promise.resolve()).then(fn, fn);
+        this.writes = next.catch(() => {});
+        return next;
+    }
+    update(id, fields = {}, db = null) {
+        return this.serial(async () => {
+            const record = await this.get(id);
+            if(!record) return null;
+            Object.assign(record.summary, fields);
+            await idb.put('activity', record);
+            const listed = db?.activity?.find?.((a) => a.id === id);
+            if(listed) Object.assign(listed, fields);
+            xf.dispatch('activity:updated', record.summary);
+            return record.summary;
+        });
     }
     // The ride a second at a time, for the image button (ride-card.js): the
     // target is the one actually set, intensity and extensions included.
@@ -638,9 +684,6 @@ class Activity extends Model {
             return null;
         }
     }
-    async get(id) {
-        return await idb.get('activity', id);
-    }
     add(activity, activityList) {
         activityList.unshift(activity);
         if(activityList.length > this.capacity) {
@@ -653,20 +696,28 @@ class Activity extends Model {
         idb.remove('activity', id);
     }
     async upload(service, id) {
-        let record = await idb.get('activity', id);
+        const record = await this.get(id);
+        if(!record) return ':fail';
 
         if(service === 'strava' ||
            service === 'intervals' ||
            service === 'trainingPeaks') {
 
+            // uploadWorkout may note what the service called it on record.summary (intervals_id)
             const res = await this.api[service].uploadWorkout(record);
-            record = await idb.get('activity', id);
-            record.summary.status[service] = res.substring(1);
-            await idb.put('activity', record);
+            const fresh = await this.serial(async () => {
+                const fresh = (await this.get(id)) ?? record;
+                fresh.summary.status[service] = res.substring(1);
+                if(record.summary.intervals_id) fresh.summary.intervals_id = record.summary.intervals_id;
+                await idb.put('activity', fresh);
+                return fresh;
+            });
 
             xf.dispatch(`action:activity:${id}`, `:${service}:upload${res}`);
+            xf.dispatch('activity:updated', fresh.summary);
+            return res;
         }
-        return;
+        return ':fail';
     }
     async download(id) {
         const self = this;

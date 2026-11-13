@@ -281,3 +281,21 @@ export function fileName(timestamp) {
     const p = (n) => String(n).padStart(2, '0');
     return `ride-${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}.png`;
 }
+
+// A saved activity's chart, from the record or, for an older ride, its FIT.
+export async function recordChart(record, {workout = null, toAbsolute = null} = {}) {
+    if(record?.chart?.t?.length) return record.chart;
+    if(!record?.blob) return null;
+    const buf = await record.blob.arrayBuffer();
+    return chartFromFit(new DataView(buf), {name: record.summary?.name, workout, toAbsolute});
+}
+
+export function downloadBlob(blob, name) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+}

@@ -366,19 +366,23 @@ xf.reg('ui:workout:upload', async function(files, db) {
     }
 
 });
-xf.reg('watch:stopped', (_, db) => {
+// The ride is saved the moment it stops; the session backup is cleared only
+// once the saved copy has been read back (models.js Activity.createFromCurrent).
+xf.reg('watch:stopped', async (_, db) => {
     try {
-        models.activity.createFromCurrent(db);
-        xf.dispatch('activity:save:success');
+        const summary = await models.activity.createFromCurrent(db);
+        xf.dispatch('activity:save:success', summary);
     } catch (err) {
         console.error(`Error on activity save: `, err);
-        xf.dispatch('activity:save:fail');
+        xf.dispatch('activity:save:fail', err?.message ?? String(err));
     }
-
 });
 xf.reg('activity:save:success', (e, db) => {
     models.session.reset(db);
     models.session.clearSaved();
+});
+xf.reg('ui:activity:update', ({id, fields}, db) => {
+    models.activity.update(id, fields, db);
 });
 
 // the ride in progress, saved as it goes: every 15 s while recording, and
