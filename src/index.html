@@ -282,8 +282,10 @@
                             <workout-text-event id="workout-text-event"></workout-text-event>
                             <!-- <z-stack data-key="graphZStack">
                                  <z-stack-item class="active"> -->
-                                    <h4 class="graph--heading">Graph</h4>
-                                    <moxy-graph class="graph--cont">
+                                    <live-chart></live-chart>
+                                    <!-- the Moxy strip, kept but hidden: no Moxy here, and its power
+                                         trace was a 1 px/s line on a 0–600 W scale -->
+                                    <moxy-graph class="graph--cont" style="display:none">
                                         <svg id="moxy-svg">
                                             <polyline id="moxy-path-smo2" class="moxy--path" points=""/>
                                             <polyline id="moxy-path-thb" class="moxy--path" points=""/>

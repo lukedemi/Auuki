@@ -2,6 +2,8 @@ import { xf, exists, existance, equals, clamp, debounce, toFixed  } from '../fun
 import { formatTime, translate } from '../utils.js';
 import { models } from '../models/models.js';
 import { g } from './graph.js';
+import liveSamples from '../live-samples.js';
+import { smooth, bucket } from './live-chart.js';
 
 
 
@@ -134,6 +136,7 @@ class WorkoutGraph extends HTMLElement {
         xf.sub('db:page', this.onPage.bind(this), this.signal);
         xf.sub('db:lapTime', this.onLapTime.bind(this), this.signal);
         xf.sub('db:workoutStatus', this.onWorkoutStatus.bind(this), this.signal);
+        xf.sub('live:sample', this.drawActual.bind(this), this.signal);
 
         this.addEventListener('mouseover', this.onHover.bind(this), this.signal);
         this.addEventListener('mouseout', this.onMouseOut.bind(this), this.signal);
@@ -279,6 +282,14 @@ class WorkoutGraph extends HTMLElement {
             this.dom.steps     = this.querySelectorAll('.graph--bar');
 
             this.progress({index: self.index, dom: self.dom, parent: self, lapTime: self.lapTime});
+
+            // what was actually ridden, drawn over the plan
+            this.maxPower = intervalsToMaxPower(this.workout.intervals, this.ftp);
+            this.insertAdjacentHTML('beforeend',
+                `<svg class="workout-graph--actual" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2;overflow:visible">` +
+                `<polyline fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" points=""/></svg>`);
+            this.dom.actual = this.querySelector('.workout-graph--actual polyline');
+            this.drawActual();
         }
 
         if(equals(this.type, 'course')) {
@@ -292,6 +303,44 @@ class WorkoutGraph extends HTMLElement {
     }
     renderInfo(args = {}) {
         renderInfo(args);
+    }
+    // Elapsed seconds to a point on the bars: find the interval the second
+    // falls in and place it across that interval's bar group, so the line
+    // lands on the same blocks the plan drew. 10 s of power, one point per
+    // couple of pixels.
+    drawActual() {
+        if(!equals(this.type, 'workout') || !this.dom?.actual || !this.dom.intervals?.length) return;
+        const rows = liveSamples.all();
+        if(rows.length < 2) { this.dom.actual.setAttribute('points', ''); return; }
+
+        const self = this;
+        const box = this.getBoundingClientRect();
+        if(!box.width) return;
+        const groups = Array.from(this.dom.intervals).map((el, i) => {
+            const r = el.getBoundingClientRect();
+            return { left: r.left - box.left, width: r.width, dur: self.workout.intervals[i]?.duration ?? 0 };
+        });
+        const ends = [];
+        groups.reduce((acc, g) => { ends.push(acc + g.dur); return acc + g.dur; }, 0);
+        const total = ends[ends.length - 1] || 1;
+
+        const toX = (t) => {
+            if(t >= total) return null;
+            let i = ends.findIndex((e) => t < e);
+            const start = i > 0 ? ends[i - 1] : 0;
+            const g = groups[i];
+            return g.left + g.width * (t - start) / Math.max(1, g.dur);
+        };
+        const ps = smooth(rows.map((r) => r.w || 0), 10);
+        const pts = rows.map((r, i) => ({ t: r.t, w: ps[i] })).filter((r) => r.t < total);
+        const cols = Math.max(20, Math.round(box.width / 2));
+        const viewPort = { height: this.viewPort.height };
+        const h = box.height;
+        const line = bucket(pts, cols, (r) => r.w)
+              .map(([t, w]) => [toX(t), h - Math.min(h, powerToHeight(w, this.maxPower, viewPort))])
+              .filter(([px]) => px != null)
+              .map(([px, py]) => `${px.toFixed(1)},${py.toFixed(1)}`);
+        this.dom.actual.setAttribute('points', line.join(' '));
     }
 }
 
