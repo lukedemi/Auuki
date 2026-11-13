@@ -17,6 +17,16 @@ function Keyboard() {
         let keyCode = e.keyCode;
         let code = e.code;
 
+        // typing in a field (the target or Workout % inputs) is the field's
+        if(['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target?.tagName)) return;
+
+        // Shift + Up / Down: the ERG target itself, 5 W a press
+        if(e.shiftKey && !e.ctrlKey && !e.altKey && (isKeyUp(code) || isKeyDown(code))) {
+            e.preventDefault();
+            xf.dispatch(isKeyUp(code) ? 'key:shift:up' : 'key:shift:down');
+            return;
+        }
+
         if(e.isComposing ||
             keyCode === 229 ||
             e.ctrlKey ||
@@ -61,10 +71,19 @@ function KeyboardControls() {
     let watchStatus = 'stopped';
     xf.sub('db:watchStatus', x => watchStatus = x);
 
-    // Modes Inc/Dec
+    // Modes Inc/Dec. In ERG, Up / Down move the Workout % (this fork, Nov 13,
+    // 2026, rider: "Pressing the up and down arrow key should change the
+    // percentage power or workout percentage, not the power target number");
+    // Shift + Up / Down still move the target 5 W.
+    xf.sub('key:shift:up', e => {
+        if(mode === ControlMode.erg) xf.dispatch('ui:power-target-inc');
+    });
+    xf.sub('key:shift:down', e => {
+        if(mode === ControlMode.erg) xf.dispatch('ui:power-target-dec');
+    });
     xf.sub('key:up', e => {
         if(mode === ControlMode.erg) {
-            xf.dispatch('ui:power-target-inc');
+            xf.dispatch('ui:intensity-inc');
         }
         if(mode === ControlMode.resistance) {
             xf.dispatch('ui:resistance-target-inc');
@@ -75,7 +94,7 @@ function KeyboardControls() {
     });
     xf.sub('key:down', e => {
         if(mode === ControlMode.erg) {
-            xf.dispatch('ui:power-target-dec');
+            xf.dispatch('ui:intensity-dec');
         }
         if(mode === ControlMode.resistance) {
             xf.dispatch('ui:resistance-target-dec');
@@ -89,10 +108,15 @@ function KeyboardControls() {
     xf.sub('key:e', e => {
         xf.dispatch('ui:mode-set', ControlMode.erg);
     });
+    // R and S switch to modes that are hidden unless Settings > Resistance &
+    // Slope is on; a stray key must not leave the trainer in one of them
+    const ergOnly = () => document.documentElement.classList.contains('erg-only');
     xf.sub('key:r', e => {
+        if(ergOnly()) return;
         xf.dispatch('ui:mode-set', ControlMode.resistance);
     });
     xf.sub('key:s', e => {
+        if(ergOnly()) return;
         xf.dispatch('ui:mode-set', ControlMode.sim);
     });
 

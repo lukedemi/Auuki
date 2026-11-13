@@ -19,12 +19,14 @@ node scripts/traces.mjs                          # the latest sessions
 node scripts/traces.mjs latest --kind event,error,mark --since 30m --follow
 ```
 
-- **Workout intensity**: under the ERG target, *Workout − 100% +* scales every power target in the workout, 1% a press (50–150%); tap the number to go back to 100%. A change rescales the current target by the ratio, so a nudge on this interval survives it. The ERG target itself moves 5 W a press (was 10).
+- **Workout intensity**: beside the ERG target, *Workout %* scales every power target in the workout, 1% a press (50–150%), built exactly like the target control (type a value too; *reset* goes back to 100%). **Up / Down arrows move the Workout %**; Shift + Up / Down move the target 5 W. A change rescales the current target by the ratio, so a nudge on this interval survives it. The ERG target itself moves 5 W a press (was 10).
 - **Interval beeps you can hear**: the volume starts at 50 (upstream shipped at 0, so the 4-second countdown into each interval was silent), audio unlocks on the first touch or key press (an auto-started ride has none), and changing the volume plays a blip at the new level.
 
 - **L/R balance**: a two-sided meter (Assioma Duo pairs as one Bluetooth device, the left pedal speaking for both, so its power is already the total) sends the left's share with every power reading; it goes into the FIT as standard `left_right_balance` (the right's % with bit 7 set, as an Edge writes it), the power meter card's L/R tile, the live chart's window average (power-weighted, coasting left out) and the traces.
 - **Units**: imperial by default (a stored choice wins), the units on the Speed and Distance tiles, distance always in mi or km, and the virtual speed now uses the rider's weight (it stayed at an 85 kg default).
 
+- **ERG only**: the Resistance and Slope mode buttons (and the R / S keys) are off unless Settings → Resistance & Slope is on.
+- **Numbers as big as their tiles** (`src/views/fit-text.js`, desktop only): each value is sized to fill its tile, measured with every digit as 0 so a ticking clock never changes size, and every row shares one size.
 - **Desktop layout**: on a landscape screen 1200 x 650 or larger, the numbers stack in a column on the left (Power and Target, Interval Time, HR and Cadence, Power Lap and Elapsed, Time Left and Finish), the live chart and the workout graph take the rest, the ERG target and Workout % sit under them, and the watch and menu share one bottom row. The rules are the last block in `src/css/flux.css`; smaller screens keep upstream's layouts.
 - **Work (kJ)** replaces Slope (always 0.0 in ERG): the ride's power summed second by second. On desktop the column reads Power · Heart Rate / Cadence · Work / Elapsed · Time Left · Finish, and under it a **Lap** section with everything about the current interval: Interval Left and Target large, Power Lap and HR Lap.
 - **Time Left and Finish** replace Speed and Distance: what remains of the workout (the rest of this interval plus every one after it), and the clock time it will end, which slides later while paused (`src/views/time-left.js`).
