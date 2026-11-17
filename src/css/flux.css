@@ -1747,6 +1747,10 @@ auto-start-counter {
 .library--switch--group {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
+    /* a layout that names fewer columns than there are tabs (Activities is
+       the fourth) runs the rest on in the same row, never onto a second */
+    grid-auto-flow: column;
+    grid-auto-columns: max-content;
     justify-items: center;
     align-items: center;
 }
