@@ -393,6 +393,25 @@ function Connectable(args = {}) {
         return isConnected() ? {ok: true, reason: 'connected'} : {ok: false, reason: 'did not answer'};
     }
 
+    // The picker narrowed to one remembered device by name (this fork, Nov
+    // 17, 2026): where the browser cannot reconnect by itself (Chrome
+    // without getDevices), a click opens a picker showing just that device.
+    // Each filter keeps its services, so every service stays allowed.
+    async function connectByName(name) {
+        if(!('bluetooth' in navigator)) return {ok: false, reason: 'no Web Bluetooth in this browser'};
+        const named = {
+            filters: (filter.filters ?? [{}]).map((f) => Object.assign({}, f, {name})),
+            optionalServices: filter.optionalServices ?? [],
+        };
+        try {
+            _device = await navigator.bluetooth.requestDevice(named);
+        } catch(e) {
+            return {ok: false, reason: e?.name === 'NotFoundError' ? 'picker closed' : (e?.message ?? String(e))};
+        }
+        await connect({watching: false, requesting: false});
+        return isConnected() ? {ok: true, reason: 'connected'} : {ok: false, reason: 'did not answer'};
+    }
+
     // request a device by using the configured filter
     // can throw an error handle it outside
     //
@@ -712,6 +731,7 @@ function Connectable(args = {}) {
         connect,
         disconnect,
         reconnect,
+        connectByName,
         cancelWatch,
         request,
         watch,

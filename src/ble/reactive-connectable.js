@@ -265,6 +265,13 @@ function ReactiveConnectable(args = {}) {
         }
 
         xf.sub(`ui:${getIdentifier()}:switch`, onSwitch, signal);
+        // the Reconnect strip's button for this device (views/device-reconnect.js)
+        xf.sub(`ui:${getIdentifier()}:reconnect`, async () => {
+            const device = remembered()[identifier];
+            if(!device?.name || connectable.isConnected()) return;
+            const res = await connectable.connectByName(device.name);
+            xf.dispatch('ble:reconnect', {identifier, name: device.name, try: 'picker', state: res.ok ? 'connected' : 'failed', reason: res.reason});
+        }, signal);
 
         if(equals(deviceType, Device.powerMeter)) {
             xf.sub('ui:pedals:crank:set', onSetCrank, signal);
@@ -299,5 +306,5 @@ function ReactiveConnectable(args = {}) {
 }
 
 export default ReactiveConnectable;
-export { remembered, REMEMBER_KEY };
+export { remembered, reconnectOnLoad, REMEMBER_KEY };
 
