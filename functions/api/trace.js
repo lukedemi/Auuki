@@ -45,6 +45,8 @@ export function clean(body, now = Date.now()) {
 }
 
 export async function onRequestPost({request, env}) {
+    // the household's only: Access signs every request it lets through
+    if(!request.headers.get('cf-access-jwt-assertion')) return json({error: 'household only'}, 403);
     if(!env.DB) return json({error: 'no D1 binding'}, 500);
     let body;
     try { body = await request.json(); } catch(e) { return json({error: 'bad json'}, 400); }

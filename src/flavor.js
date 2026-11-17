@@ -6,9 +6,10 @@
 //   home    auuki.d3-mi.com, behind Cloudflare Access: everything, including
 //           the trainer room from Home Assistant (room.js, /api/room) and the
 //           debug traces (trace.js, /api/trace).
-//   public  ergatory.d3-mi.com, open to anyone: the app without those two.
-//           It never makes those calls or shows their settings, and it is
-//           deployed with no server functions at all.
+//   public  ergatory.d3-mi.com, open to anyone. The household's extras
+//           (the room, the traces, hosting group rides) switch on there only
+//           for a browser signed in to the household (household.js); for
+//           everyone else it never makes those calls or shows their settings.
 //
 // Set in the built page: <meta name="ergatory-flavor" content="home">, which
 // `npm run release:public` rewrites to "public" in dist-public/index.html
@@ -26,9 +27,11 @@ export function readFlavor(doc = (typeof document !== 'undefined' ? document : n
 
 export const FLAVOR = readFlavor();
 
+// room and traces: the household's, on either site (household.js decides on
+// the public one; these are what the build itself allows)
 export const flags = Object.freeze({
-    room:   FLAVOR === 'home',
-    traces: FLAVOR === 'home',
+    room:   true,
+    traces: true,
     // Strava only on the public ERGatory (rider, Nov 17, 2026: "we'll
     // standardize on ergatory for anything strava"): its Strava app's callback
     // domain is ergatory.d3-mi.com, and the household's own rides reach
