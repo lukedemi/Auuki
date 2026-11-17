@@ -381,6 +381,9 @@ xf.reg('activity:save:success', (e, db) => {
     models.session.reset(db);
     models.session.clearSaved();
 });
+xf.reg('ui:activity:delete', (id, db) => {
+    models.activity.delete(id, db);
+});
 xf.reg('ui:activity:update', ({id, fields}, db) => {
     models.activity.update(id, fields, db);
 });

@@ -94,7 +94,8 @@ function Intervals(args = {}) {
         window.history.pushState({}, document.title, window.location.pathname);
     }
 
-    async function uploadWorkout(record) {
+    // quiet: the background uploader's tries, which must not pop an error box
+    async function uploadWorkout(record, {quiet = false} = {}) {
         const blob = record.blob;
         const workoutName = record.summary?.name ?? 'Powered by Auuki workout';
 
@@ -115,7 +116,7 @@ function Intervals(args = {}) {
                 return ':success';
             } catch(error) {
                 console.error(`:intervals :direct :upload :fail`, error);
-                xf.dispatch('ui:modal:error:open', `intervals.icu upload failed: ${error.message}`);
+                if(!quiet) xf.dispatch('ui:modal:error:open', `intervals.icu upload failed: ${error.message}`);
                 return ':fail';
             }
         }

@@ -1402,6 +1402,10 @@ class NavigationStack extends HTMLElement {
                     report: {
                         $view: document.querySelector(`#view--workouts-report`),
                         $link: document.querySelector(`#link--workouts-report`),
+                    },
+                    activities: {
+                        $view: document.querySelector(`#view--workouts-activities`),
+                        $link: document.querySelector(`#link--workouts-activities`),
                     }
                 }
             },
@@ -1447,6 +1451,10 @@ class NavigationStack extends HTMLElement {
         }
         if(action === 'workouts:report') {
             this.switch('report', this.tabs.workouts.children);
+            return;
+        }
+        if(action === 'workouts:activities') {
+            this.switch('activities', this.tabs.workouts.children);
             return;
         }
     }

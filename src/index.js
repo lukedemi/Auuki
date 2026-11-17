@@ -4,6 +4,7 @@ import './db.js';
 import './views/views.js';
 import './power-match.js';
 import './live-samples.js';
+import './auto-upload.js';
 import './ble/devices.js';
 import './ble/obc/controls.js';
 import './watch.js';
