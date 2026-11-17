@@ -10,6 +10,8 @@ Status: design only, nothing built. November 2026.
 4. All the way through, everyone sees everyone's video, hears anyone not muted, and sees each rider's power, heart rate and cadence. Some of those are charted, some are just numbers.
 5. When the workout ends, everyone drops into **cooldown**: the same free mode as warmup. People ride and talk for as long as they like and leave when they want.
 
+**The workout is fixed once the ride is created.** Nobody, host included, can change it, extend an interval or skip one during the ride. That keeps the schedule a constant every client can hold on its own (see Durability).
+
 ## The pieces
 
 ```
@@ -34,7 +36,7 @@ Status: design only, nothing built. November 2026.
         │
         │ WebRTC (audio/video only), token from /api/group/:id/media
         ▼
-   Hosted SFU (LiveKit Cloud — or Cloudflare Realtime, see Media)
+   Cloudflare RealtimeKit (hosted SFU; LiveKit Cloud as fallback)
 ```
 
 Three channels, deliberately separate:
@@ -53,7 +55,7 @@ The site is already Cloudflare Pages + Functions + D1. A Durable Object is the C
 
 - **One instance per ride**, addressed by ride id (`env.GROUP.idFromName(rideId)`), so every rider's WebSocket lands on the same object, in one place, single-threaded. No pub/sub, no Redis.
 - **WebSocket Hibernation** means an idle lobby (people connected 15 minutes early, nothing changing) costs next to nothing.
-- **Alarms** let it wake itself at the start time and the end time to flip phases and broadcast, even if no messages arrive.
+- **Alarms** let it wake itself at the start time and the end time to announce the phase change, even if no messages arrive. (Clients don't depend on these; see Time.)
 - **Transactional storage** keeps the schedule and roster safe across evictions and deploys.
 
 Pages Functions can't define a Durable Object class, so it lives in a small separate Worker (`workers/group/`, deployed as `auuki-group`) and the Pages project binds to it:
@@ -100,7 +102,7 @@ That one change makes the hard cases fall out for free:
 | Join late (5 minutes in) | `positionAt` puts you in interval 3, 40 s left, like everyone else |
 | Reload mid-ride | same; the ride restore already brings back the recording |
 | Pause (manual or auto) | **your recording pauses; the group's workout doesn't**. Resume and you're wherever the group is now |
-| `+5 min`, lap skip | off in group mode (or host-only — see Later) |
+| `+5 min`, lap skip | off in group mode, for everyone including the host |
 
 To make the interval change feel simultaneous, tick on the second boundary rather than 1 s after whenever the timer happened to start: the worker aligns its first tick with `setTimeout(… , 1000 - (clock.now() - startAt) % 1000)`. The 4-second countdown beep then sounds on the same beat in every room.
 
@@ -115,7 +117,7 @@ Browsers' clocks can be seconds apart, so every rider uses **server time**, esti
 
 `clock.now() = performance.timeOrigin + performance.now() + offset` (`performance.now()` because it's monotonic; the wall clock can be stepped by the OS). Expected accuracy is tens of milliseconds, which is far tighter than the 1 s resolution the workout has.
 
-The DO is the only thing that decides phases, but clients don't wait to be told: each computes the phase from the same schedule and the same clock, so the switch happens locally on the second. The DO's `phase` broadcast (fired by its alarms) is a confirmation and a fallback for clients whose maths disagrees.
+Nobody waits to be told a phase has changed: each computes the phase from the same schedule and the same clock, so the switch happens locally on the second. The DO's `phase` broadcast (fired by its alarms) is a confirmation and a fallback for clients whose maths disagrees.
 
 ## Phases and what each rider's app does
 
@@ -147,7 +149,7 @@ The app already builds exactly this row in `live-samples.js`; group mode sends t
 
 ### Down: the DO batches, once a second
 
-Relaying every message to every rider would be N² messages. Instead the DO keeps the latest sample per rider and, on a 1 s alarm while anyone is connected, broadcasts **one** snapshot of all of them:
+Relaying every message to every rider would be N² messages. Instead the DO keeps the latest sample per rider and broadcasts **one** snapshot of all of them at most once a second: when a sample arrives and the last broadcast was 1 s or more ago, it sends one. No per-second alarm or timer, so nothing keeps the object busy that the riders' own messages don't:
 
 ```json
 {"type":"tick","server":1763412346000,"phase":"workout",
@@ -190,13 +192,16 @@ The site sits behind Cloudflare Access for the household, and guests won't have 
 
 ### Provider
 
-**Recommendation: LiveKit Cloud**, behind a thin adapter (`src/group/media.js`) so it can be swapped.
+**Recommendation: Cloudflare RealtimeKit**, behind a thin adapter (`src/group/media.js`) so it can be swapped.
 
-- Mature browser SDK: simulcast, adaptive stream (only pulls the resolution a tile actually shows), speaker detection, mute state, reconnection — all things you'd otherwise build.
-- Open source server, so self-hosting is a later option, not a rewrite.
-- Tokens are JWTs minted with an API key/secret — the same shape as `HA_TOKEN` today: `LIVEKIT_KEY`/`LIVEKIT_SECRET` as Pages secrets, and `POST /api/group/:id/media` mints a token scoped to that ride's room and that rider's identity.
+- A video-call SDK (rooms, mute state, speaker detection, simulcast, its own reconnection) on Cloudflare's SFU, so you aren't building track negotiation.
+- Same account, same bill, same dashboard as the rest of Auuki. One fewer vendor to go down or change terms.
+- Cheapest by a long way at this size (see Cost): 10,000 participant-minutes a month are included on every account.
+- The Pages Function `POST /api/group/:id/media` creates the meeting once per ride and adds each rider as a participant with the RealtimeKit API, using a Cloudflare API token stored as a Pages secret (like `HA_TOKEN` today); the browser gets only that rider's auth token.
 
-**Alternative: Cloudflare Realtime (SFU, or RealtimeKit on top of it).** Everything stays in one Cloudflare account and the DO could also be the signalling server. The cost is more client work on the raw SFU (track negotiation, simulcast layer choice), which is why it's second here. The adapter boundary keeps this decision cheap to revisit.
+**Fallback: LiveKit Cloud.** The more mature SDK (adaptive stream, very good simulcast handling) and an open-source server you could self-host. Its free plan covers only two or three 10-person rides a month before you'd need the $50/month plan. If RealtimeKit's SDK turns out rough in step 4, switching means rewriting only `media.js`.
+
+**Later, if it ever matters: Cloudflare's raw SFU.** It bills only egress, with the first 1,000 GB a month free, so it would cost nothing here. The catch is doing track negotiation and simulcast layer choice yourself, with the DO as the signalling server. Not worth it at $0–2 a ride.
 
 Peer-to-peer mesh (no SFU) is out: at 6+ riders every laptop is uploading its camera 5+ times.
 
@@ -216,15 +221,16 @@ GroupRide (one per ride)
   memory:   sockets  (hibernatable; riderId in the attachment)
             latest   {riderId → last sample}
             history  {riderId → ring buffer, 600 rows}
-  alarms:   lobby open (T−15) · start (T0) · end (T0 + duration) · 1 s tick while anyone is connected
+  alarms:   lobby open (T−15) · start (T0) · end (T0 + duration)
             · close (cooldown with nobody connected for 10 min → write the record to D1, shut down)
+  no timers: the 1 s broadcast is driven by incoming samples
 ```
 
 ### Protocol (JSON over one WebSocket)
 
 | Direction | Type | Body |
 |---|---|---|
-| C → S | `hello` | session token |
+| C → S | `hello` | session token, plus your last 10 min of samples (rebuilds the DO's history after a restart) |
 | S → C | `welcome` | schedule, roster, your riderId, server time, history |
 | C ↔ S | `ping` / `pong` | clock sync (above) |
 | C → S | `s` | your 1 Hz sample |
@@ -232,9 +238,102 @@ GroupRide (one per ride)
 | S → C | `roster` | someone joined / left / was removed / muted |
 | S → C | `phase` | `warmup` → `workout` → `cooldown`, with the server time it happened |
 | C → S | `react` | 👍 🔥 (optional; a burst shown on that rider's tile) |
-| host → S | `kick`, `close`, `schedule` | host controls |
+| host → S | `kick`, `close` | host controls (nothing touches the workout) |
 
 Every message has a `v` (protocol version), so an old cached app (the service worker) gets a "please reload" instead of misbehaving.
+
+## Cost
+
+Prices as published in November 2026 ([RealtimeKit](https://developers.cloudflare.com/realtime/realtimekit/pricing/), [Realtime SFU](https://developers.cloudflare.com/realtime/sfu/pricing/), [LiveKit](https://livekit.com/pricing), [Durable Objects](https://developers.cloudflare.com/durable-objects/platform/pricing/)).
+
+**Assumptions for one ride:** 15 min warmup + 60 min workout + 15 min cooldown = **90 min per rider**. Video is a grid of 180p tiles (~150 kbps each) plus one 720p tile for whoever is talking (~1.5 Mbps), with most people muted. Each rider then *receives* about 2.8 Mbps with 10 people and 1.9 Mbps with 5. The bandwidth figures are estimates; measure them in step 4.
+
+| Per ride | 5 riders | 10 riders |
+|---|---|---|
+| Participant-minutes | 450 | 900 |
+| Video sent to riders (SFU egress) | ~6.5 GB | ~19 GB |
+| Durable Object: billed requests (incoming messages ÷ 20) | ~1,400 | ~2,700 |
+| Durable Object: duration (128 MB × 90 min) | ~340 GB-s | ~675 GB-s |
+
+**What that costs:**
+
+| Provider | Included each month | A 10-rider ride beyond that | Weekly 10-rider ride (4/month) |
+|---|---|---|---|
+| **Cloudflare RealtimeKit** (recommended) | 10,000 participant-minutes on every account: ~11 ten-rider or ~22 five-rider rides | 900 min × $0.002 = **$1.80** ($0.90 for 5 riders) | **$0** |
+| LiveKit Cloud, free (Build) | 5,000 min and 50 GB: bandwidth runs out first, after ~2 ten-rider rides | no overage price listed; you'd move to Ship | doesn't fit (~76 GB) |
+| LiveKit Cloud, Ship ($50/mo) | 150,000 min and 250 GB: ~13 ten-rider rides | ~$2.30 bandwidth + $0.45 minutes ≈ **$2.75** | **$50** |
+| Cloudflare raw SFU (no SDK) | 1,000 GB egress: ~50 ten-rider rides | 19 GB × $0.05 = **$0.95** | **$0** |
+
+The RealtimeKit page doesn't say whether SFU egress is billed on top of the minutes. If it is, 19 GB a ride sits well inside the 1,000 GB a month that Realtime gives every account.
+
+**The server costs nothing at this size.** One ride is ~2,700 billed requests and ~675 GB-s. The Workers free plan allows 100,000 requests and 13,000 GB-s **a day**; the $5 paid plan includes 1 million requests and 400,000 GB-s a month. D1 and Pages Functions use is a few dozen rows and requests per ride.
+
+**Bottom line:** with RealtimeKit, a weekly 5–10 person ride is **free**. Past ~11 ten-rider rides in a month it's about **$1.80 a ride**.
+
+## Durability
+
+The worry is the one server every rider is connected to. The design's answer: **make that server something the ride can lose for minutes at a time without anyone's workout noticing**, then make it come back cleanly.
+
+### 1. The server is not on the workout's critical path
+
+Everything a rider needs to stay in sync, they hold locally after the first `welcome`:
+
+- **The schedule**: the frozen workout and `startAt`. It's written to IndexedDB next to the ride backup, so it survives a reload with the server down.
+- **The clock offset**, which drifts by milliseconds per hour; a reload keeps the last good one.
+- **`positionAt()`**, which is pure local maths.
+
+So if the WebSocket drops at minute 23, every rider's intervals still change on the same second, ERG targets still change, beeps still sound, and every recording still saves. **What's lost while it's down is only other people's numbers**, which grey out with "reconnecting". The same goes in the other direction: if video drops, the stats and the workout carry on.
+
+This is the reason the workout can't change mid-ride. A constant schedule means no client ever needs the server to tell it what's next.
+
+| What fails | What riders notice |
+|---|---|
+| A rider's Wi-Fi blips | their own tiles of others go grey for a few seconds, then refill from history |
+| The DO restarts (deploy, Cloudflare moves it, a crash) | everyone's tiles grey for 1–5 s while sockets reconnect; workout unaffected |
+| The DO is unreachable for minutes | as above, longer; workout unaffected; video and audio unaffected |
+| RealtimeKit has an outage | no video or audio; workout and stats unaffected |
+| A rider reloads mid-interval | back in the same interval at the same second; ride restore brings back their recording |
+
+### 2. The server keeps almost nothing that can't be rebuilt
+
+- **Durable state** (in the DO's storage, and in D1): the schedule and the roster. Small, written rarely, transactional.
+- **Memory only**: the latest sample per rider and the 10-minute history. If the object restarts, these are rebuilt **from the clients**. On reconnect each rider sends `hello` with their last 10 minutes from `live-samples.js`, which they already keep. A restart loses nothing anyone can see.
+- **No timers in memory.** The 1 s broadcast is driven by incoming samples, and the phase alarms are stored alarms, which survive restarts and retry on failure. Nothing depends on a `setInterval` surviving.
+
+### 3. Reconnecting is a normal event, not an error path
+
+The client treats the socket as something that will drop, and recovers by itself:
+
+- **Detecting a dead socket**: browsers can take minutes to notice a half-open TCP connection. So the client watches for `tick`s: no `tick` for 3 s while others are riding (or no `pong` for 10 s in the lobby) means close and reconnect, without waiting for the browser.
+- **Backoff with jitter**: 0.5 s, 1 s, 2 s, 4 s, then every 10 s, each ±30%, so ten riders don't all retry at the same instant after a restart.
+- **Resuming**: the session token is reusable for the whole ride, so a reconnect is just `hello` again. The roster keeps the rider's id, so their tile stays where it was rather than leaving and re-joining.
+- **The session token outlives the server**: it's checked with an HMAC secret, so a reconnect needs no lookup that could fail.
+- Reconnects, close codes and gaps go to the existing debug traces (D1 `auuki`), so after a ride `scripts/traces.mjs` shows exactly what dropped and for how long.
+
+### 4. Deploys can't break a ride
+
+Deploys are the most likely cause of a restart, and the one you control.
+
+- **The DO Worker is separate and small** (`auuki-group`). Deploying the app (Pages) never touches it, and the protocol is versioned so an old object and a new app still talk.
+- Cloudflare now defers a DO's code update until the object hibernates (up to 5 minutes, best effort). **During a ride it won't hibernate**, because samples arrive every second, so an update is forced at the end of that window and disconnects everyone. Rather than rely on that, **the deploy script for `auuki-group` refuses to run while any ride is in its window** (lobby open through 2 h after the end), checked in D1. Override with `--force`.
+- Even a forced restart mid-ride is the "DO restarts" row in the table above: a few seconds of grey tiles.
+
+### 5. One object is plenty
+
+10 riders × 1 message a second is 10 messages in and 10 broadcasts out per second. Cloudflare's docs say a single object serves thousands of connections; this is three orders of magnitude below that. The object is created in the data centre closest to whoever opens the ride first. A rider across the country gets maybe 60–80 ms more latency, which doesn't matter for 1 s stats, and the clock sync measures and cancels it.
+
+### 6. Testing it
+
+Durability gets its own tests in build step 1, before any UI polish:
+
+- **Unit**: `positionAt()` over every boundary, late joins and clock offsets (Jest, like the rest of `test/`).
+- **Chaos, with Playwright and 5 headless riders** against `wrangler dev`: kill one rider's socket, kill all of them, restart the DO mid-interval, skew one rider's clock by 10 s, throttle a tab to background rates. Pass condition: every rider's interval index changes within 100 ms of the others', and every rider's stats tiles recover within 5 s.
+
+### What's still a real risk
+
+- **A Cloudflare-wide incident.** It would take Access, Pages and the DO together; there's no sensible way to hedge that at household scale. Riders who already loaded the page keep riding in sync on their cached schedule.
+- **Join failures right at T0.** A rider who has never connected has no schedule. Opening the lobby 15 minutes early gives slack, and the join page retries until it has the schedule.
+- **Bugs in our own code** in the DO are more likely than Cloudflare failing. Keep the DO dumb (relay, roster, schedule, nothing clever) and keep the clever parts in `schedule.js`, which is pure and unit-tested.
 
 ## Storage (D1)
 
@@ -300,16 +399,14 @@ schema.sql                        + the two tables
 1. **Shared clock and schedule, no video.** `schedule.js` + tests, the DO with `hello`/`welcome`/`ping`/`phase`, `groupMode` in the watch. Test: two browsers (or one with a faked clock offset) change intervals on the same second, through a reload and a late join.
 2. **Stats.** Samples up, `tick` down, simple tiles with numbers. Then the sparklines and the group chart.
 3. **Links and guests.** Create page, join page, join key, Access bypass on the group paths, session tokens.
-4. **Media.** LiveKit adapter, grid, mute/push-to-talk, simulcast, audio-only fallback.
+4. **Media.** RealtimeKit adapter, grid, mute/push-to-talk, simulcast, audio-only fallback.
 5. **Polish.** Results in D1 and a results card, reactions, the host's controls.
 
 Steps 1–2 are the risky, Auuki-specific part; 4 is mostly SDK wiring.
 
 ## Risks and open questions
 
-- **Cost of media.** An SFU charges for participant-minutes and/or bandwidth. For household-sized rides (≤10 people, ~1 h) it is small, but worth checking the provider's current free tier before step 4.
 - **Rider's machine load.** Video grid + Web Bluetooth + ERG control on one laptop. Keep subscribed video to 180p and few tiles at full rate; measure CPU on the weakest machine early.
 - **Bluetooth glitches look like dropouts.** Already handled locally (power reads 0 after 2 s quiet); the tile shows "coasting" rather than a scary 0.
-- **Host workout changes mid-ride** (`+5 min` for everyone, skip an interval). Not in v1. If wanted: the host sends a new schedule with a version; `positionAt` takes the schedule with its edits; everyone recomputes. The pure-function design makes this a data change, not a timing problem.
 - **Different FTPs / Workout %.** Targets are per rider; the group chart shows % of target so it compares fairly. Showing absolute watts to others is a share setting.
 - **What does "everyone" mean for a 50-person ride?** The design holds to ~20; beyond that the grid needs paging/active-speaker-only and the DO tick should send diffs. Not a v1 concern.
