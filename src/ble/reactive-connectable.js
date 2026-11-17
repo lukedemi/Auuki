@@ -50,6 +50,44 @@ function ReactiveConnectable(args = {}) {
         xf.dispatch(`${getIdentifier()}:connected`);
         xf.dispatch(`${getIdentifier()}:name`, connectable.getName());
         remember();
+        if(equals(deviceType, Device.powerMeter)) readPedals();
+    }
+
+    // The pedals' settings (this fork, Nov 17, 2026; cps/cps.js): what they
+    // support and their crank length, read on every connect; set and zeroed
+    // from Settings > Power Meter (views/pedal-settings.js).
+    function pedals() {
+        return connectable.services?.cps?.capabilities ? connectable.services.cps : null;
+    }
+    async function readPedals() {
+        const cps = pedals();
+        const caps = cps ? cps.capabilities() : {control: false, crankLength: false, zero: false};
+        xf.dispatch('pedals:caps', caps);
+        if(!caps.crankLength) return;
+        try {
+            xf.dispatch('pedals:crank', {mm: await cps.getCrankLength()});
+        } catch(e) {
+            xf.dispatch('pedals:crank', {error: e.message});
+        }
+    }
+    async function onSetCrank(mm) {
+        const cps = pedals();
+        if(!cps) return xf.dispatch('pedals:crank', {error: 'no pedals connected'});
+        try {
+            xf.dispatch('pedals:crank', {mm: await cps.setCrankLength(mm), set: true});
+        } catch(e) {
+            xf.dispatch('pedals:crank', {error: e.message});
+        }
+    }
+    async function onZero() {
+        const cps = pedals();
+        if(!cps) return xf.dispatch('pedals:zero', {error: 'no pedals connected'});
+        xf.dispatch('pedals:zero', {busy: true});
+        try {
+            xf.dispatch('pedals:zero', {ok: true, offset: await cps.zero()});
+        } catch(e) {
+            xf.dispatch('pedals:zero', {error: e.message});
+        }
     }
 
     // Remembered devices (this fork, Nov 13, 2026): the last device of this
@@ -227,6 +265,13 @@ function ReactiveConnectable(args = {}) {
         }
 
         xf.sub(`ui:${getIdentifier()}:switch`, onSwitch, signal);
+
+        if(equals(deviceType, Device.powerMeter)) {
+            xf.sub('ui:pedals:crank:set', onSetCrank, signal);
+            xf.sub('ui:pedals:zero',      onZero, signal);
+            xf.sub('ui:pedals:read',      readPedals, signal);
+            xf.sub(`${identifier}:disconnected`, () => xf.dispatch('pedals:caps', null), signal);
+        }
 
         if(equals(deviceType, Device.controllable)) {
             xf.sub('db:mode',             onMode, signal);
