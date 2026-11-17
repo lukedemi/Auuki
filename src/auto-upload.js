@@ -21,6 +21,7 @@ import { xf } from './functions.js';
 import { models } from './models/models.js';
 import direct from './models/intervals-direct.js';
 import stravaDirect from './models/strava-direct.js';
+import { flags } from './flavor.js';
 
 export const MIN_S = 5 * 60;
 export const MAX_AGE_MS = 3 * 24 * 3600 * 1000;
@@ -40,7 +41,7 @@ export function due(s, now = Date.now(), tries = new Map(), service = 'intervals
 
 export const SERVICES = [
     {name: 'intervals', configured: () => direct.isConfigured(), since: () => 0},
-    {name: 'strava',    configured: () => stravaDirect.isConnected(), since: () => stravaDirect.connectedAt()},
+    {name: 'strava',    configured: () => flags.strava && stravaDirect.isConnected(), since: () => stravaDirect.connectedAt()},
 ];
 
 function AutoUpload(args = {}) {

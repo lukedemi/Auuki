@@ -29,6 +29,13 @@ export const FLAVOR = readFlavor();
 export const flags = Object.freeze({
     room:   FLAVOR === 'home',
     traces: FLAVOR === 'home',
+    // Strava only on the public ERGatory (rider, Nov 17, 2026: "we'll
+    // standardize on ergatory for anything strava"): its Strava app's callback
+    // domain is ergatory.d3-mi.com, and the household's own rides reach
+    // Strava through bikes.
+    strava: FLAVOR === 'public',
 });
+
+export const PUBLIC_URL = 'https://ergatory.d3-mi.com';
 
 export const APP_NAME = 'ERGatory';
