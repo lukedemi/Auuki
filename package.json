@@ -31,5 +31,11 @@
         "msgpackr-extract": false,
         "unrs-resolver": false
     },
-    "name": "ergatory"
+    "name": "ergatory",
+    "@parcel/transformer-js": {
+        "inlineEnvironment": [
+            "NODE_ENV",
+            "ERGATORY_FLAVOR"
+        ]
+    }
 }
