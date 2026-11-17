@@ -21,6 +21,7 @@
 import { xf, exists } from './functions.js';
 import { uuid } from './storage/uuid.js';
 import { flags } from './flavor.js';
+import { whenHousehold } from './household.js';
 
 const FLUSH_MS  = 10000;
 const MAX_BUF   = 3000;
@@ -194,8 +195,8 @@ function Trace(args = {}) {
 
 const trace = Trace();
 if(flags.traces && typeof window !== 'undefined' && typeof document !== 'undefined' && typeof fetch === 'function' && !globalThis.__AUUKI_NO_TRACE__) {
-    trace.start();
-    window.trace = trace;
+    // the household's only (household.js): at once on its own site, after /api/me on the public one
+    whenHousehold(() => { trace.start(); window.trace = trace; });
 }
 
 export default trace;

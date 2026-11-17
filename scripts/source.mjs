@@ -5,9 +5,9 @@
 //   node scripts/source.mjs [dist] [home|public]
 //
 // home    the whole repository at HEAD (the household copy, behind Access)
-// public  what builds and runs the public app: src/, its one server
-//         function (the Strava relay), the build configuration and the
-//         licence (not the household's other functions, deploy notes or tests)
+// public  what builds and runs the public app: src/, the server functions
+//         it runs (functions/, the group-ride Worker), the build
+//         configuration and the licence (not deploy notes or tests)
 //
 // It refuses to package a tree with uncommitted changes under src/, so the
 // download always matches what was built.
@@ -24,10 +24,10 @@ if(git('status --porcelain -- src')) {
 }
 const sha = git('rev-parse --short HEAD');
 const tracked = new Set(git('ls-files').split('\n'));
-const PUBLIC = ['src', 'functions/api/strava', 'scripts/version.mjs', 'scripts/flavor.mjs', 'scripts/source.mjs', 'LICENSE.txt', 'package.json', 'package-lock.json',
+const PUBLIC = ['src', 'functions', 'workers/group/src', 'workers/group/package.json', 'scripts/version.mjs', 'scripts/flavor.mjs', 'scripts/source.mjs', 'LICENSE.txt', 'package.json', 'package-lock.json',
                 '.babelrc', '.htmlnanorc', 'robots.txt', 'sitemap.xml'];
 const paths = flavor === 'public'
-    ? PUBLIC.filter((p) => p === 'src' || p === 'functions/api/strava' || tracked.has(p))
+    ? PUBLIC.filter((p) => p === 'src' || p === 'functions' || p === 'workers/group/src' || tracked.has(p))
     : [];
 
 if(!existsSync(dist)) { console.error(`source.mjs: no ${dist}/`); process.exit(1); }

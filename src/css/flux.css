@@ -4160,9 +4160,10 @@ and (orientation: landscape) {
 }
 
 /* the public build (flavor.js): what only the household copy has */
-html[data-flavor="public"] .home-only,
-html[data-flavor="public"] room-status { display: none !important; }
-html:not([data-flavor="public"]) .public-only { display: none !important; }
+html[data-flavor="public"]:not([data-household]) .home-only,
+html[data-flavor="public"]:not([data-household]) room-status { display: none !important; }
+html:not([data-flavor="public"]) .public-only,
+html[data-household] .public-only { display: none !important; }
 
 /* Group rides (views/group-views.js): the group panel fills the live
    chart's place, and on desktop takes more of the height from the workout

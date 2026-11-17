@@ -67,7 +67,15 @@ const json = (body, status = 200) => new Response(JSON.stringify(body), {
     status, headers: {'content-type': 'application/json', 'cache-control': 'no-store'},
 });
 
-export async function onRequestGet({env}) {
+// Access must have let them in: on ergatory.d3-mi.com this path is one of the
+// few Access keeps for the household, and a request it did not sign is refused
+// here too, so the house's sensors never reach anyone else.
+export function viaAccess(request) {
+    return !!(request.headers.get('cf-access-jwt-assertion') && request.headers.get('cf-access-authenticated-user-email'));
+}
+
+export async function onRequestGet({request, env}) {
+    if(!viaAccess(request)) return json({error: 'household only'}, 403);
     if(!env.HA_URL || !env.HA_TOKEN) return json({error: 'Home Assistant is not configured'}, 503);
     const ids = Object.values(ENTITIES).flat();
     const body = JSON.stringify({template: template(ids)});

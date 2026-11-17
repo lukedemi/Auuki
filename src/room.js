@@ -11,6 +11,7 @@
 
 import { xf, exists } from './functions.js';
 import { flags } from './flavor.js';
+import { whenHousehold } from './household.js';
 
 const POLL_MS = 30000;
 const LOG_EVERY_S = 60;
@@ -81,7 +82,7 @@ function Room(args = {}) {
 
 const room = Room();
 if(flags.room && typeof window !== 'undefined' && typeof document !== 'undefined' && typeof fetch === 'function' && !globalThis.__AUUKI_NO_ROOM__) {
-    room.start();
+    whenHousehold(() => room.start());
 }
 
 // what the ride's log says, for the end screen: first and last, the fans' minutes

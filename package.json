@@ -3,7 +3,10 @@
     "engines": {
         "node": ">=22.18.0"
     },
-    "source": "src/index.html",
+    "source": [
+        "src/index.html",
+        "src/transfer.html"
+    ],
     "scripts": {
         "test": "jest",
         "start": "parcel",

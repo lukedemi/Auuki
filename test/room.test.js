@@ -43,10 +43,13 @@ describe('the room, from Home Assistant', () => {
         expect(none.fans.front).toBe(null);
     });
     test('the endpoint retries the house\'s front door, and says when HA is not set up', async () => {
-        expect((await onRequestGet({env: {}})).status).toBe(503);
+        const signed = {headers: {get: (k) => ({'cf-access-jwt-assertion': 'jwt', 'cf-access-authenticated-user-email': 'a@b'})[k.toLowerCase()] ?? null}};
+        const unsigned = {headers: {get: () => null}};
+        expect((await onRequestGet({request: unsigned, env: {HA_URL: 'x', HA_TOKEN: 'y'}})).status).toBe(403);   // not through Access
+        expect((await onRequestGet({request: signed, env: {}})).status).toBe(503);
         let n = 0;
         global.fetch = jest.fn(async () => { if(++n < 3) throw new Error('reset'); return {ok: true, status: 200, text: async () => JSON.stringify(raw())}; });
-        const r = await onRequestGet({env: {HA_URL: 'https://ha.example/', HA_TOKEN: 't'}});
+        const r = await onRequestGet({request: signed, env: {HA_URL: 'https://ha.example/', HA_TOKEN: 't'}});
         expect(r.status).toBe(200);
         expect(n).toBe(3);
         expect(global.fetch.mock.calls[0][0]).toBe('https://ha.example/api/template');

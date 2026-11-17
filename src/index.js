@@ -1,6 +1,10 @@
 import { xf } from './functions.js';
 import { FLAVOR } from './flavor.js';
 if(typeof document !== 'undefined') document.documentElement.dataset.flavor = FLAVOR;
+import household from './household.js';
+household.start();
+import { auto as transferIn } from './transfer-in.js';
+transferIn();
 import './trace.js';           // first, so it sees every console line
 import './db.js';
 import './views/views.js';
