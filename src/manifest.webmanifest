@@ -1,13 +1,13 @@
 {
     "name": "ERGatory",
     "short_name": "ERGatory",
-    "description": "Cycling Structured Training",
+    "description": "Indoor trainer workouts in ERG mode",
     "start_url": "/",
     "display": "standalone",
     "orientation": "any",
     "scope": "/",
-    "theme_color": "#35363a",
-    "background_color": "#28272D",
+    "theme_color": "#14161b",
+    "background_color": "#14161b",
     "icons": [
         {
             "src": "./images/logo/logo-192.png",
