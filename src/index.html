@@ -582,7 +582,14 @@
 
                 <!-- workout-list -->
                 <div id="view--workouts-workouts" class="workout-list sub-tab active">
-                    <group-create></group-create>
+                    <!-- desktop: the workout you picked, large, beside the lists
+                         (views/workout-detail.js); on a phone only the group
+                         ride box shows, above the lists, as before -->
+                    <div class="wk--pane">
+                        <workout-detail></workout-detail>
+                        <group-create></group-create>
+                    </div>
+                    <div class="wk--lists">
                     <div class="list--sub-section">
                         <div class="list--row--outer">
                             <div class="list--row--inner list--heading--cont control">
@@ -655,6 +662,7 @@
                         </div>
                     </div>
                     <br/><br/><br/>
+                    </div> <!-- wk--lists -->
                 </div> <!-- workout-list -->
             </div>
 

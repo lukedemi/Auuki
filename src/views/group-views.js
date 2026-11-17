@@ -513,17 +513,27 @@ class GroupCreate extends HTMLElement {
         injectStyle('group-create-style', createStyle);
         this.abort = new AbortController();
         this.workout = null;
-        xf.sub('db:workout', (w) => { this.workout = w; this.render(); }, {signal: this.abort.signal});
+        this.shown = null;    // the workout in the desktop detail pane, if any
+        xf.sub('db:workout', (w) => { this.loaded = w; this.update(); }, {signal: this.abort.signal});
+        xf.sub('workout-detail:shown', (w) => { this.shown = w; this.update(); }, {signal: this.abort.signal});
         this.render();
     }
     disconnectedCallback() {
         this.abort.abort();
     }
+    // on desktop, the workout in the detail pane; on a phone, the loaded one
+    update() {
+        const next = this.shown ?? this.loaded;
+        if(next === this.workout) return;
+        this.workout = next;
+        this.render();
+    }
     render() {
         const name = this.workout?.meta?.name ?? 'the loaded workout';
+        const hint = this.shown ? 'Pick another workout from the list to host that one.' : 'Load a different workout below first to host that one.';
         this.innerHTML = `<div class="gc--box">
             <h2>Group ride</h2>
-            <div>Ride <b>${esc(name)}</b> together, starting at the same second, with video. Load a different workout below first to host that one.</div>
+            <div>Ride <b>${esc(name)}</b> together, starting at the same second, with video. ${hint}</div>
             <div class="gc--row">
                 <label>Title<input type="text" class="gc--title" maxlength="80" value="${esc(name)}"></label>
                 <label>Starts<input type="datetime-local" class="gc--start" value="${toLocalInput(defaultStart())}"></label>
