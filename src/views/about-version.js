@@ -8,6 +8,10 @@ import { FLAVOR } from '../flavor.js';
 class AboutVersion extends HTMLElement {
     connectedCallback() {
         const label = FLAVOR === 'public' ? 'public' : 'household';
+        // the source download (scripts/source.mjs writes it at release); set
+        // here, because the bundler would try to build a link in the HTML
+        const src = document.getElementById('about--source');
+        if(src) src.setAttribute('href', './source.tar.gz');
         this.textContent = label;
         if(typeof fetch !== 'function') return;
         fetch('./version.json', {cache: 'no-store'})
