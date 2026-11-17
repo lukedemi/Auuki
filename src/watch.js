@@ -1,4 +1,5 @@
 import { equals, exists, empty, first, last, xf, avg, max, toFixed, print, } from './functions.js';
+import { pedallingThroughPause, RESUME_AFTER_S } from './pause-resume.js';
 import { kphToMps, mpsToKph, timeDiff, pad } from './utils.js';
 import { models } from './models/models.js';
 import { ControlMode, } from './ble/enums.js';
@@ -10,7 +11,6 @@ const timer = new Worker(new URL('./timer.js', import.meta.url));
 
 const AUTO_PAUSE_W = 20;   // under this is stopped
 const AUTO_PAUSE_S = 3;    // for this many seconds
-const RESUME_AFTER_S = 5;  // pedalling this long ends a manual pause
 
 class Watch {
     constructor(args) {
@@ -52,7 +52,11 @@ class Watch {
         xf.sub('db:stepDuration',     time => { self.stepDuration  = time; });
         xf.sub('db:intervalIndex',   index => { self.intervalIndex = index; });
         xf.sub('db:stepIndex',       index => { self.stepIndex     = index; });
-        xf.sub('db:watchStatus',     state => { self.state         = state; });
+        xf.sub('db:watchStatus',     state => {
+            if(state === 'paused' && self.state !== 'paused') self.pausedAt = Date.now();
+            self.state = state;
+        });
+        xf.sub('db:cadence',         rpm => { self.cadence = rpm; });
         xf.sub('db:workoutStatus',   state => {
             self.stateWorkout = state;
 
@@ -113,6 +117,9 @@ class Watch {
     status() {
         return this.state;
     }
+    isPedallingThroughPause(power, now = Date.now()) {
+        return pedallingThroughPause({power, cadence: this.cadence, pausedAt: this.pausedAt, now});
+    }
     onSources(value) {
         this.autoPause = value.autoPause ?? this.autoPause;
         this.autoStart = value.autoStart ?? this.autoStart;
@@ -144,7 +151,7 @@ class Watch {
             // pause banner (this fork, Nov 13, 2026, rider: "you can sit there
             // grinding for way too long"). Auto-pauses still resume at once.
             if(this.isPaused() && !this.hasBeenAutoPaused) {
-                if(power > 40) {
+                if(this.isPedallingThroughPause(power)) {
                     this.pausedPedalling = (this.pausedPedalling ?? 0) + 1;
                     const left = RESUME_AFTER_S - this.pausedPedalling;
                     xf.dispatch('watch:resume-countdown', Math.max(0, left));
