@@ -867,7 +867,13 @@ class IntervalExtend extends HTMLElement {
             e.stopPropagation();
             if(!this.$btn.disabled) xf.dispatch('ui:interval-extend', seconds);
         }, signal);
-        xf.sub('db:workoutStatus', (st) => { this.$btn.disabled = st !== 'started'; }, signal);
+        let status = 'stopped', group = false;
+        const set = () => {
+            this.$btn.disabled = status !== 'started' || group;
+            this.$btn.title = group ? 'Not in a group ride: everyone rides the same workout' : `Add ${seconds / 60} min to this interval (+ key)`;
+        };
+        xf.sub('db:workoutStatus', (st) => { status = st; set(); }, signal);
+        xf.sub('db:groupMode', (on) => { group = !!on; set(); }, signal);
     }
     disconnectedCallback() {
         this.abortController.abort();

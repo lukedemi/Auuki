@@ -103,6 +103,9 @@ let db = {
     // Course
     courseIndex: 0,
 
+    // Group rides (group/group.js): the workout follows the group's clock
+    groupMode: false,
+
     // Request ANT+ Device
     antSearchList: [],
     antDeviceId: {},
@@ -399,6 +402,10 @@ xf.sub('ui:activity:upload:by:id', (id) => {
 // download the current activity as a .fit file
 xf.reg('ui:activity:save', (_, db) => {
     xf.dispatch(`ui:page-set`, 'workouts');
+});
+
+xf.reg('group:mode', (on, db) => {
+    db.groupMode = !!on;
 });
 
 xf.reg('course:index', (index, db) => {

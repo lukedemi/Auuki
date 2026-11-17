@@ -22,6 +22,7 @@ import './ant-device-scan.js';
 import './keyboard.js';
 import './power-match-debug.js';
 import './intervals-direct-settings.js';
+import './group-views.js';
 
 function start() {
     console.log('start views.');

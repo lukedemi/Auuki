@@ -1,6 +1,6 @@
 # Group rides — architecture design
 
-Status: design only, nothing built. November 2026.
+Status: built (November 2026). Code in `src/group/`, `src/views/group-views.js` and `workers/group/`; this doc is kept in step with it. Where the build differs from the first design, the text below says what was built.
 
 ## What it does
 
@@ -58,17 +58,16 @@ The site is already Cloudflare Pages + Functions + D1. A Durable Object is the C
 - **Alarms** let it wake itself at the start time and the end time to announce the phase change, even if no messages arrive. (Clients don't depend on these; see Time.)
 - **Transactional storage** keeps the schedule and roster safe across evictions and deploys.
 
-Pages Functions can't define a Durable Object class, so it lives in a small separate Worker (`workers/group/`, deployed as `auuki-group`) and the Pages project binds to it:
+Pages Functions can't define a Durable Object class, so it lives in a small separate Worker (`workers/group/`, deployed as `auuki-group`). **As built, that Worker holds the whole group API too** (create, join, the WebSocket, the media token), and the Pages project forwards `/api/group/*` and `/api/host/group` to it over a service binding:
 
 ```toml
 # wrangler.toml (Pages)
-[[durable_objects.bindings]]
-name = "GROUP"
-class_name = "GroupRide"
-script_name = "auuki-group"
+[[services]]
+binding = "GROUP_API"
+service = "auuki-group"
 ```
 
-The Pages Function at `/api/group/:id/ws` checks the join token and passes the upgrade request to `env.GROUP.get(id).fetch(request)`. The browser only ever talks to `auuki.d3-mi.com`.
+That keeps every piece of group logic in one Worker that can be run and tested alone (`wrangler dev`, `scripts/group-chaos.mjs`). The browser still only ever talks to `auuki.d3-mi.com`.
 
 ## Time: the part that has to be right
 
@@ -181,12 +180,13 @@ Plus one **group chart** above the tiles: everyone's % of target over the workou
 
 The site sits behind Cloudflare Access for the household, and guests won't have Access accounts. So:
 
-- **Creating** a ride stays behind Access (`POST /api/group` sees `Cf-Access-Authenticated-User-Email`, the host is recorded).
-- **The invite link** is `https://auuki.d3-mi.com/g/<rideId>#<joinKey>`. `joinKey` is random (128 bits), generated at create time and stored hashed in D1. The fragment never reaches server logs.
-- **An Access Bypass policy** on just the paths a guest needs: `/g/*`, `/api/group/*` and the static app bundle. Every one of those endpoints checks the join key itself. Household members still arrive with their Access identity and get it as their name.
-- **Joining** asks for a display name (remembered), which devices are connected, and the share toggles. The server gives back a **rider id** and a short-lived **session token** (HMAC-signed `{rideId, riderId, exp}` with a Pages secret), used for the WebSocket and the media token.
-- **The lobby window** is enforced in the DO: a join earlier than `startAt − 15 min` gets `{phase:'closed', opensAt}`, and the page counts down to it.
-- The host can **remove** a rider (closes their socket, revokes their media token) and **close** the ride.
+- **Creating** a ride is `POST /api/host/group`, a path of its own so it can stay behind Access while the guest paths are opened. The Worker checks for the `Cf-Access-Authenticated-User-Email` header too, and records the host.
+- **The invite link** is `https://auuki.d3-mi.com/?g=<rideId>#k=<joinKey>` (a query, not a `/g/` path, so the app's assets load the same as on the home page). `joinKey` is random (128 bits), made at create time and stored only as its SHA-256. The fragment never reaches server logs.
+- **The host's link** adds `&h=<hostKey>`. The app keeps the host key in localStorage and takes it out of the address bar on load. Joining with it makes the rider the host, who can remove riders and end the ride.
+- **Access** has to let guests reach the app and `/api/group/*`. Each of those endpoints checks the join key itself. `/api/host/group`, `/api/room` and `/api/trace` stay household-only. This is set in Cloudflare Access, not in this repo.
+- **Joining** asks for a display name (remembered) and whether to share heart rate. The server gives back a **rider id** and a **session token** (HMAC-signed `{ride, rider, name, host, exp}` with the Worker's `TOKEN_SECRET`; it expires 12 h after the ride ends), used for the WebSocket and the media token. Rejoining with a still-valid token (a reload, a second visit) keeps the same rider id.
+- **The lobby window** is enforced at join: earlier than `startAt − 15 min` gets a 425 with `opensAt`, and the page counts down to it.
+- The host can **remove** a rider (their socket is closed with 4003 and they can't reconnect) and **end the ride** for everyone (4000).
 
 ## Media
 
@@ -207,8 +207,8 @@ Peer-to-peer mesh (no SFU) is out: at 6+ riders every laptop is uploading its ca
 
 ### Settings that matter on a trainer
 
-- **Join muted** with push-to-talk (space bar) and a toggle; fans and freewheels are loud. Browser `noiseSuppression` and `echoCancellation` on.
-- **Video**: publish 3 simulcast layers (720p / 360p / 180p); grid tiles subscribe to 180p at 15 fps, the active speaker or a pinned rider to 720p. Stop pulling video for tiles off-screen.
+- **Join muted**, with a mic button and the **M** key to toggle it (space already pauses the ride); fans and freewheels are loud. RealtimeKit handles echo cancellation and noise suppression.
+- **Video**: the aim is 3 simulcast layers (720p / 360p / 180p), grid tiles pulling 180p at 15 fps and the speaker 720p. **Not tuned yet:** in RealtimeKit this is the preset's video settings (dashboard), to be set and measured once video is switched on.
 - **Bandwidth fallback**: under a bad connection the adapter drops to audio-only and shows avatars; stats keep flowing over the WebSocket regardless.
 - The rider's ride **never depends on media**: if the SFU fails to connect, a banner says so and the workout carries on.
 
@@ -362,47 +362,46 @@ CREATE TABLE group_riders (
 
 The workout is **frozen into the ride** at create time, so editing it in the library or on intervals.icu afterwards can't put riders on different plans. Each rider's full ride is still their own FIT, saved and uploaded as today; D1 only keeps the group's summary (for a "past group rides" list and a results card).
 
-## Where it goes in the repo
+## Where it is in the repo
 
 ```
-workers/group/                  the Durable Object Worker (its own wrangler.toml, deployed as auuki-group)
-  index.js                        GroupRide class
-functions/api/group/
-  index.js                        POST create (Access only)
-  [id].js                         GET ride info for the join page (join key checked)
-  [id]/join.js                    POST join → riderId + session token
-  [id]/ws.js                      WebSocket upgrade → the DO
-  [id]/media.js                   POST → media token
+workers/group/                  the auuki-group Worker (its own wrangler.toml and package.json)
+  src/index.js                    the API: create, info, join, ws, media
+  src/ride.js                     GroupRide, the Durable Object
+  src/token.js                    session tokens, keys, ids
+functions/api/group/[[path]].js   Pages → the Worker (service binding)
+functions/api/host/group.js       Pages → the Worker, for creating (stays behind Access)
 src/group/
-  schedule.js                     positionAt(): pure, the heart of the sync; heavily unit-tested
+  schedule.js                     positionAt(): pure, the heart of the sync
   clock.js                        server-time offset over the socket
-  connection.js                   the WebSocket: reconnect with backoff, hello/welcome, send samples
-  group.js                        group mode: wires schedule + clock into watch.js, owns phases
-  media.js                        the provider adapter (connect, publish, subscribe, mute)
-src/views/
-  group-join.js                   name, devices, share toggles, countdown to the lobby
-  group-panel.js                  video grid with stat tiles, the group chart, mute/camera controls
-  group-create.js                 pick a workout + time, copy the link
-schema.sql                        + the two tables
+  connection.js                   the WebSocket: reconnect with backoff and jitter, dead-socket watchdog
+  riders.js                       everyone's latest and last 10 min; the workout summary
+  group.js                        GroupController: the link, joining, phases, driving the watch, samples
+  start.js                        the app's one controller, with the Worker ticker
+  ticker.js                       a 50 ms tick from a Worker (background tabs throttle page timers)
+  media.js                        RealtimeKit (loaded only in a group ride, as its own chunk)
+src/views/group-views.js          <group-join>, <group-panel>, <group-create>
+scripts/group-chaos.mjs           5 simulated riders through cut sockets and a server restart
+scripts/deploy-group.mjs          deploys the Worker, refusing while a ride is on
+test/group/                       schedule, clock, connection, the Durable Object, tokens, the controller
+schema.sql                        + group_rides, group_riders
 ```
 
-**Changes to existing code**, kept small:
+**Changes to existing code:**
 
-- `watch.js` — a `groupMode` flag. When set: `onTick` takes the position from `group.js` instead of decrementing; `+5 min` and lap skip are disabled; `workout:done` leads into cooldown instead of stopping; auto-pause still pauses the *recording* only.
-- `timer.js` — accept an aligning first delay so ticks land on the second boundary.
-- `live-samples.js` — no change; `group.js` reads `liveSamples.latest`.
-- `live-chart.js` — accept a sample source, so the group chart can reuse it.
-- `sw.js` — never cache `/api/group/*`.
+- `watch.js`: a `groupMode` flag (`db.groupMode`, set by `group:mode`). In a group workout `onTick` only records elapsed time; lap and back are locked; `ui:workoutStart` and auto-start's workout start are left to the group's clock; `+5 min` is refused; a finished workout stays in ERG rather than dropping to slope mode. Auto-pause still pauses the *recording* only.
+- `db.js`: `groupMode`.
+- `data-views.js`: the +5 min button is disabled in a group ride.
+- `index.html`: `<group-panel>` inside `#graph-power`, `<group-join>`, `<group-create>` on the Workouts page. `flux.css`: on desktop the panel takes more height from the workout graph.
+- `package.json`: `@cloudflare/realtimekit` (pinned), and Parcel told to bundle node_modules (the app had no runtime dependencies before, so it never came up).
+- Not changed: `timer.js` (the 50 ms ticker does the aligning instead), `live-samples.js`, `live-chart.js` (the panel draws its own charts).
 
-## Build order
+## Verified
 
-1. **Shared clock and schedule, no video.** `schedule.js` + tests, the DO with `hello`/`welcome`/`ping`/`phase`, `groupMode` in the watch. Test: two browsers (or one with a faked clock offset) change intervals on the same second, through a reload and a late join.
-2. **Stats.** Samples up, `tick` down, simple tiles with numbers. Then the sparklines and the group chart.
-3. **Links and guests.** Create page, join page, join key, Access bypass on the group paths, session tokens.
-4. **Media.** RealtimeKit adapter, grid, mute/push-to-talk, simulcast, audio-only fallback.
-5. **Polish.** Results in D1 and a results card, reactions, the host's controls.
-
-Steps 1–2 are the risky, Auuki-specific part; 4 is mostly SDK wiring.
+- Unit tests (`npx jest test/group`): 44, covering the schedule to the second, the clock estimate, reconnect and the watchdog, the Durable Object (restart and rebuild, kicks, replacement, closing and the D1 record), tokens, and a whole ride through the controller (including a reload mid-interval and a reload with the server down).
+- `scripts/group-chaos.mjs` against `wrangler dev`: 5 riders with clocks off by up to 60 s, one socket cut, every socket cut, the server killed for 4 s mid-step. Worst spread between riders at a step change: 2 ms. Everyone's numbers back within 2.1 s of each disruption.
+- In the built app (`wrangler pages dev` + the Worker, 3 Chromium riders, fake trainers): interval changes within ~30 ms of each other across riders, including one reloaded mid-interval.
+- **Not yet verified: video.** RealtimeKit needs its secrets set; with none, rides run without video (that path is tested).
 
 ## Risks and open questions
 

@@ -36,6 +36,8 @@ node scripts/traces.mjs latest --kind event,error,mark --since 30m --follow
 - **The trainer room** (`functions/api/room.js`, `src/room.js`, `src/views/room-status.js`): temperature, humidity, CO₂ and the two fans from Home Assistant, over the live chart (CO₂ amber from 1,000 ppm, red from 1,400), read every 30 s. The Pages Function asks HA's template API for every value in one call, so the browser holds no HA token and HA needs no CORS; it needs `HA_URL` and `HA_TOKEN` as secrets on the Pages project (`npx wrangler pages secret put HA_TOKEN --project-name auuki`), and without them the strip stays hidden. Temperature and humidity come from the room's own sensor first and the CO₂ unit's second (homeassistant `docs/SENSORS.md`). A log of the room, once a minute while the timer runs, is saved with the ride and summed up on the end screen.
 - **The ride as an image** (`src/ride-card.js`): a 1600 x 1000 PNG for Strava, on the end screen, with no title, the headline numbers at the top; on the chart, besides power and heart rate, the extras as lines, each on its own scale with its last value at its end and only when the ride carries it: room temperature and CO₂ from Home Assistant, cadence (60 s means, a stop a gap), and a strip along the bottom while a fan was on; then the workout as written (the plan, at the ride's FTP) as zone-coloured blocks, a dashed line wherever the target set was off the plan (Workout %, a nudge), power and heart rate over them, the reps labelled, and time, NP, IF, TSS, kJ and average heart rate. A ride keeps its one-second power, heart rate, target set and planned watts on the activity record (the plan from the workout step running each second, so extensions and pauses stay aligned); one saved before that is read back from its FIT, the plan laid over its laps from the workout still loaded if it has the same name, else that day's planned workout of the same name on intervals.icu. Upstream left the button as a greyed placeholder.
 
+- **Group rides** (`src/group/`, `src/views/group-views.js`, `workers/group/`; design in `doc/group-ride.md`): host one from the Workouts page with the workout that's loaded and a start time, and send the link. Riders can join from 15 minutes before the start and warm up however they like; at the start time the workout starts for everyone on the same second (the interval is worked out from a shared server clock, not counted, so a reload, a late join, a pause or a background tab all land where everyone else is); at the end everyone drops into cool-down, ERG free, for as long as they like. Everyone's video, mic (joined muted; **M** toggles) and numbers in place of the live chart: power with a 2-minute sparkline over their target, % of target by zone, heart rate (if shared) and cadence, and a group chart of everyone's % of target. The workout is fixed for the ride: no +5 min, no skipping. The server is a Durable Object per ride in its own Worker, `auuki-group`, reached through a service binding; it keeps no timing, so if it restarts or is unreachable the workout carries on and only other people's numbers go grey. Video is Cloudflare RealtimeKit (optional: without its secrets, rides run without video). `node --no-warnings scripts/group-chaos.mjs` rides 5 simulated riders with wrong clocks through cut sockets and a server restart.
+
 Deploy (from `master`, by hand — nothing deploys on merge):
 
 ```bash
@@ -45,6 +47,19 @@ python3 ../homeassistant/scripts/cf-pages dist --name auuki --domain auuki.d3-mi
 ```
 
 `release` builds `dist/` and writes `dist/version.json`; `cf-pages` puts Access (the `household` group) in front of the project before uploading and checks the gate afterwards. Run it from this directory: wrangler picks up `functions/` and `wrangler.toml` (the D1 binding) from the working directory. The schema is `schema.sql` (`npx wrangler d1 execute auuki --remote --file schema.sql`).
+
+Group rides need the `auuki-group` Worker deployed before the Pages project (its service binding names it), once with the schema applied and its secrets set:
+
+```bash
+cd workers/group && npm install
+npx wrangler secret put TOKEN_SECRET          # any long random string
+npx wrangler secret put RTK_ACCOUNT_ID        # video (optional): the Cloudflare account id,
+npx wrangler secret put RTK_APP_ID            # the RealtimeKit app's id,
+npx wrangler secret put RTK_API_TOKEN         # and an API token with Realtime edit rights
+cd ../.. && node scripts/deploy-group.mjs     # refuses while a ride is on; --force overrides
+```
+
+Guests have no household login, so Access must let them reach the app and `/api/group/*`, while `/api/host/group` (creating a ride), `/api/room` and `/api/trace` stay household-only. The group endpoints check the ride's join key themselves.
 
 ---
 

@@ -29,5 +29,13 @@
         "lmdb": false,
         "msgpackr-extract": false,
         "unrs-resolver": false
+    },
+    "dependencies": {
+        "@cloudflare/realtimekit": "2.0.4"
+    },
+    "targets": {
+        "default": {
+            "includeNodeModules": true
+        }
     }
 }

@@ -4154,3 +4154,18 @@ and (orientation: landscape) {
         font-size: 0.75rem;
     }
 }
+
+/* Group rides (views/group-views.js): the group panel fills the live
+   chart's place, and on desktop takes more of the height from the workout
+   graph, since the riders are what's watched. */
+#graph-power {
+    position: relative;
+}
+@media only screen
+and (min-width: 1200px)
+and (min-height: 650px)
+and (orientation: landscape) {
+    body.group-mode #home-page-wrapper {
+        grid-template-rows: 0 minmax(0, 2.4fr) minmax(0, 0.8fr) auto 76px;
+    }
+}
