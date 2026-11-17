@@ -183,7 +183,7 @@ The site sits behind Cloudflare Access for the household, and guests won't have 
 - **Creating** a ride is `POST /api/host/group`, a path of its own so it can stay behind Access while the guest paths are opened. The Worker checks for the `Cf-Access-Authenticated-User-Email` header too, and records the host.
 - **The invite link** is `https://auuki.d3-mi.com/?g=<rideId>#k=<joinKey>` (a query, not a `/g/` path, so the app's assets load the same as on the home page). `joinKey` is random (128 bits), made at create time and stored only as its SHA-256. The fragment never reaches server logs.
 - **The host's link** adds `&h=<hostKey>`. The app keeps the host key in localStorage and takes it out of the address bar on load. Joining with it makes the rider the host, who can remove riders and end the ride.
-- **Access**: guests open rides on a second Pages project, `auuki-ride`, serving the same build. Its hostnames (`auuki-ride.pages.dev`, and `ride.d3-mi.com` once DNS points there) are open, except `/api/room`, `/api/trace` and `/api/host`, which stay household-only. `auuki.d3-mi.com` is unchanged and fully household-only; the host creates rides there. A second project because Pages applies a project's `pages.dev` Access app to all its custom domains, so a bypassed hostname on `auuki` itself still asks for a login. `auuki-ride` holds no Home Assistant secrets, and the Worker's `GUEST_ORIGIN` sets where guests' links point. This is Cloudflare configuration, not code: set up November 17, 2026.
+- **Access**: guests open rides on a second Pages project, `auuki-ride`, serving the same build. Its hostnames (`ride.d3-mi.com`, `auuki-ride.pages.dev`) are open, except `/api/room`, `/api/trace` and `/api/host`, which stay household-only. `auuki.d3-mi.com` is unchanged and fully household-only; the host creates rides there. A second project because Pages applies a project's `pages.dev` Access app to all its custom domains, so a bypassed hostname on `auuki` itself still asks for a login. `auuki-ride` holds no Home Assistant secrets, and the Worker's `GUEST_ORIGIN` sets where guests' links point. This is Cloudflare configuration, not code: set up November 17, 2026.
 - **Joining** asks for a display name (remembered) and whether to share heart rate. The server gives back a **rider id** and a **session token** (HMAC-signed `{ride, rider, name, host, exp}` with the Worker's `TOKEN_SECRET`; it expires 12 h after the ride ends), used for the WebSocket and the media token. Rejoining with a still-valid token (a reload, a second visit) keeps the same rider id.
 - **The lobby window** is enforced at join: earlier than `startAt − 15 min` gets a 425 with `opensAt`, and the page counts down to it.
 - The host can **remove** a rider (their socket is closed with 4003 and they can't reconnect) and **end the ride** for everyone (4000).
@@ -393,7 +393,7 @@ schema.sql                        + group_rides, group_riders
 - `db.js`: `groupMode`.
 - `data-views.js`: the +5 min button is disabled in a group ride.
 - `index.html`: `<group-panel>` inside `#graph-power`, `<group-join>`, `<group-create>` on the Workouts page. `flux.css`: on desktop the panel takes more height from the workout graph.
-- `package.json`: `@cloudflare/realtimekit` (pinned), and Parcel told to bundle node_modules (the app had no runtime dependencies before, so it never came up).
+- `package.json`: `@cloudflare/realtimekit` (pinned), and Parcel told the target is a browser that bundles node_modules. `engines.node` had made Parcel build for Node, which never mattered with no runtime dependencies, but here it picked the Node build of `uuid` (a bare `import "crypto"`).
 - Not changed: `timer.js` (the 50 ms ticker does the aligning instead), `live-samples.js`, `live-chart.js` (the panel draws its own charts).
 
 ## Verified
@@ -401,7 +401,8 @@ schema.sql                        + group_rides, group_riders
 - Unit tests (`npx jest test/group`): 44, covering the schedule to the second, the clock estimate, reconnect and the watchdog, the Durable Object (restart and rebuild, kicks, replacement, closing and the D1 record), tokens, and a whole ride through the controller (including a reload mid-interval and a reload with the server down).
 - `scripts/group-chaos.mjs` against `wrangler dev`: 5 riders with clocks off by up to 60 s, one socket cut, every socket cut, the server killed for 4 s mid-step. Worst spread between riders at a step change: 2 ms. Everyone's numbers back within 2.1 s of each disruption.
 - In the built app (`wrangler pages dev` + the Worker, 3 Chromium riders, fake trainers): interval changes within ~30 ms of each other across riders, including one reloaded mid-interval.
-- **Not yet verified: video.** RealtimeKit needs its secrets set; with none, rides run without video (that path is tested).
+- **Video, partly verified.** With the real RealtimeKit app, the Worker creates the meeting and participants and the SDK joins; the media itself couldn't connect from the test container (its network allows only HTTPS through a proxy), so the first real ride is the first full test. When video fails, the ride carries on without it (tested).
+- The RealtimeKit app is `auuki-group-rides`, preset `group_call_participant`: HD, 24 fps, simulcast on, up to 9 remote videos — enough for 10 riders.
 
 ## Risks and open questions
 

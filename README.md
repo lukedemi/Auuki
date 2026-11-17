@@ -59,7 +59,7 @@ npx wrangler secret put RTK_API_TOKEN         # and an API token with Realtime e
 cd ../.. && node scripts/deploy-group.mjs     # refuses while a ride is on; --force overrides
 ```
 
-Guests have no household login, so they get the same build from a second Pages project, **`auuki-ride`** (`https://auuki-ride.pages.dev`; `ride.d3-mi.com` once its DNS record points there), which Access leaves open except `/api/room`, `/api/trace` and `/api/host` (household only, the "Auuki rides — household-only paths" Access app). It has no Home Assistant secrets. Pages applies a project's `pages.dev` Access app to its custom domains too, which is why guests can't simply have a bypassed hostname on `auuki`. Deploy the app to both:
+Guests have no household login, so they get the same build from a second Pages project, **`auuki-ride`** (`https://ride.d3-mi.com`, also `auuki-ride.pages.dev`), which Access leaves open except `/api/room`, `/api/trace` and `/api/host` (household only, the "Auuki rides — household-only paths" Access app). It has no Home Assistant secrets. Pages applies a project's `pages.dev` Access app to its custom domains too, which is why guests can't simply have a bypassed hostname on `auuki`. Deploy the app to both:
 
 ```bash
 npm run release
