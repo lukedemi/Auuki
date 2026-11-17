@@ -11,50 +11,68 @@
 // follow the ride there on upload and on every later edit (ride-summary.js).
 // Needs the intervals.icu key (Settings > intervals.icu); without it, nothing.
 //
+// Strava the same way once the rider has connected it (Settings > Strava,
+// strava-direct.js), for rides finished after connecting: connecting must not
+// send the last three days at once, some of them perhaps already uploaded by
+// hand.
+//
 
 import { xf } from './functions.js';
 import { models } from './models/models.js';
 import direct from './models/intervals-direct.js';
+import stravaDirect from './models/strava-direct.js';
 
 export const MIN_S = 5 * 60;
 export const MAX_AGE_MS = 3 * 24 * 3600 * 1000;
 export const BACKOFF_S = [60, 120, 300, 600, 1200];
 const TICK_MS = 60 * 1000;
 
-// is this ride one to send now?
-export function due(s, now = Date.now(), tries = new Map()) {
+// is this ride one to send to this service now?
+export function due(s, now = Date.now(), tries = new Map(), service = 'intervals', since = 0) {
     if(!s?.id) return false;
-    if((s.status?.intervals ?? 'none') === 'success') return false;
+    if((s.status?.[service] ?? 'none') === 'success') return false;
     if(!((s.duration ?? 0) >= MIN_S)) return false;
     if(!(now - (s.timestamp ?? 0) <= MAX_AGE_MS)) return false;
-    const t = tries.get(s.id);
+    if(since && (s.timestamp ?? 0) < since) return false;
+    const t = tries.get(`${service}:${s.id}`) ?? tries.get(s.id);
     return !t || now >= t.next;
 }
 
+export const SERVICES = [
+    {name: 'intervals', configured: () => direct.isConfigured(), since: () => 0},
+    {name: 'strava',    configured: () => stravaDirect.isConnected(), since: () => stravaDirect.connectedAt()},
+];
+
 function AutoUpload(args = {}) {
     const now = args.now ?? (() => Date.now());
-    const upload = args.upload ?? ((id) => models.activity.upload('intervals', id, {quiet: true}));
-    const configured = args.configured ?? (() => direct.isConfigured());
+    // tests hand in one service as {configured, upload}: intervals.icu
+    const services = args.services
+        ?? (args.upload ? [{name: 'intervals', configured: args.configured ?? (() => true), upload: args.upload, since: () => 0}] : null)
+        ?? SERVICES.map((sv) => Object.assign({}, sv, {upload: (id) => models.activity.upload(sv.name, id, {quiet: true})}));
     let rides = [];
-    const tries = new Map();   // id -> {n, next}
+    const tries = new Map();   // `${service}:${id}` -> {n, next}
     let busy = false;
 
     async function sweep() {
-        if(busy || !configured()) return [];
+        if(busy) return [];
         busy = true;
         const sent = [];
         try {
-            for(const s of rides.filter((r) => due(r, now(), tries))) {
-                xf.dispatch('activity:uploading', {id: s.id, service: 'intervals'});
-                let res = ':fail';
-                try { res = await upload(s.id); } catch(e) { res = ':fail'; }
-                sent.push([s.id, res]);
-                if(res === ':success') {
-                    tries.delete(s.id);
-                    s.status = Object.assign({}, s.status, {intervals: 'success'});
-                } else {
-                    const n = (tries.get(s.id)?.n ?? 0) + 1;
-                    tries.set(s.id, {n, next: now() + 1000 * BACKOFF_S[Math.min(n - 1, BACKOFF_S.length - 1)]});
+            for(const sv of services) {
+                if(!sv.configured()) continue;
+                for(const s of rides.filter((r) => due(r, now(), tries, sv.name, sv.since?.() ?? 0))) {
+                    const key = `${sv.name}:${s.id}`;
+                    xf.dispatch('activity:uploading', {id: s.id, service: sv.name});
+                    let res = ':fail';
+                    try { res = await sv.upload(s.id); } catch(e) { res = ':fail'; }
+                    sent.push(sv.name === 'intervals' ? [s.id, res] : [s.id, res, sv.name]);
+                    if(res === ':success') {
+                        tries.delete(key);
+                        s.status = Object.assign({}, s.status, {[sv.name]: 'success'});
+                    } else {
+                        const n = (tries.get(key)?.n ?? 0) + 1;
+                        tries.set(key, {n, next: now() + 1000 * BACKOFF_S[Math.min(n - 1, BACKOFF_S.length - 1)]});
+                    }
                 }
             }
         } finally {
@@ -67,7 +85,7 @@ function AutoUpload(args = {}) {
         xf.sub('db:activity', (list) => { rides = Array.isArray(list) ? list.slice() : []; setTimeout(sweep, 5000); });
         xf.sub('activity:add', (s) => { if(s?.id) { rides = [s, ...rides.filter((r) => r.id !== s.id)]; sweep(); } });
         xf.sub('activity:updated', (s) => { if(s?.id) rides = rides.map((r) => (r.id === s.id ? Object.assign({}, r, s) : r)); });
-        xf.sub('activity:deleted', (id) => { rides = rides.filter((r) => r.id !== id); tries.delete(id); });
+        xf.sub('activity:deleted', (id) => { rides = rides.filter((r) => r.id !== id); for(const k of [...tries.keys()]) if(k.endsWith(`:${id}`)) tries.delete(k); });
         xf.sub('ui:ride-summary:closed', () => sweep());
         setInterval(sweep, TICK_MS);
     }

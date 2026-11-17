@@ -8,7 +8,7 @@
 |---|---|---|
 | Address | **auuki.d3-mi.com** (kept: a browser keeps rides, settings and paired-device permissions per address) | **ergatory.d3-mi.com** |
 | Access | Cloudflare Access, `household` group plus named guests | none: open to anyone |
-| Pages project | `auuki` (with `functions/`, D1 `auuki`, the HA secrets) | `ergatory`, static files only, no functions, no bindings |
+| Pages project | `auuki` (with `functions/`, D1 `auuki`, the HA secrets) | `ergatory`: static files plus the Strava relay only, no bindings |
 | Extras | the trainer room from Home Assistant, debug traces | neither (not in the build) |
 | Build | `npm run release` → `dist/` | `npm run release:public` → `dist-public/` |
 | Source offered | `source.tar.gz`, the whole repository | `source.tar.gz`, what builds it (src/, build config, licence) |
@@ -20,6 +20,7 @@ Deploy the public one from a folder holding only its build, so wrangler finds no
 ```bash
 npm run release:public
 rm -rf /tmp/ergatory-public && mkdir -p /tmp/ergatory-public && cp -r dist-public /tmp/ergatory-public/site
+mkdir -p /tmp/ergatory-public/functions/api && cp -r functions/api/strava /tmp/ergatory-public/functions/api/
 cd /tmp/ergatory-public && python3 ~/homeassistant/scripts/cf-pages site --name ergatory --domain ergatory.d3-mi.com --public
 ```
 
@@ -57,6 +58,7 @@ node scripts/traces.mjs latest --kind event,error,mark --since 30m --follow
 - **Power Match picks whose power is shown** (`src/views/data-views.js` PowerMatchSetting): on, the pedals' power is shown and recorded and steers the trainer; off, the trainer's own reading is shown and recorded and the pedals play no part. A saved "off, pedals as source" state is put right on load.
 - **Rides go to intervals.icu by themselves** (`src/auto-upload.js`): any ride saved in this browser that isn't there yet is sent when it ends, when its end screen closes, when the app loads, and again on a backing-off timer (1, 2, 5, 10, then every 20 min) when intervals.icu doesn't take it; quietly, no error box. Rides under 5 minutes and older than 3 days are skipped. One upload of a ride at a time (`models.js Activity.upload`), and the external id makes a repeat a no-op.
 - **Workouts → Activities** (`src/views/activity-history.js`): its own tab beside Workouts, Editor and Ride report, every ride saved in this browser (100 kept, upstream kept 7), newest first, with when, how long, RPE and feel, and whether it's on intervals.icu. A click opens the ride's end screen, which now also has *Delete ride* (two taps). It replaced upstream's Activities list under Workouts.
+- **Strava** (`src/models/strava-direct.js`, `src/views/strava-settings.js`, `functions/api/strava/[[path]].js`): Settings → Strava has Strava's own *Connect with Strava* button, straight to strava.com/oauth/authorize asking for `read,activity:write`, back to the site's root. The return is swapped for tokens by the relay with the app's secret (`STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET` as Pages secrets on both projects; the ERGatory Strava app is client 127032, the same app bikes posts through). The tokens stay in the rider's browser; the relay stores nothing and forwards only uploads, their status, activity edits, the athlete and deauthorize. A finished ride uploads with its name and notes (external id `ergatory-<id>`), from the end screen and by the background uploader for rides finished after connecting; edits follow it; *View on Strava* in #FC5200 per Strava's brand guidelines; Disconnect revokes at Strava. The public deploy carries this one function and nothing else.
 - **The pedals' crank length and zero** (`src/ble/cps/`, `src/views/pedal-settings.js`): Settings → Power Meter shows the crank length the pedals hold, read from them on every connect over the Bluetooth control point, sets it (110–200 mm by 2.5) and zeroes them (offset compensation; cranks level, feet off). Each control shows only when the pedals' feature flags offer it; otherwise it points to the Favero app. A pedal's power is force × this length, so a wrong one reads wrong in proportion (172.5 set on 145 mm cranks reads 19 % high).
 - **Pedalling through a pause** (`src/pause-resume.js`): a pause you set yourself ends after 5 s of real pedalling, over 60 W and 40 rpm, and nothing in its first 6 s counts. Power meters hold their last reading for a few seconds after the cranks stop (the pedals reported ~95–118 W at 80 rpm for 4 s after a pause on Nov 17, 2026, and the ride resumed by itself), and feet drifting on the pedals make neither floor.
 - **Numbers hold their size** (`src/views/fit-text.js`): a plain number is sized as at least three digits and a tile only ever widens what it reserves, so a heart rate going 99 → 100 moves nothing. Power had been setting its whole `style` for its colour on every reading, wiping its fitted size until the next refit (SmO2 and THb too); they set the colour alone now.

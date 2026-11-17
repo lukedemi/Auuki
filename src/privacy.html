@@ -54,10 +54,11 @@
 
             <h2>What leaves your device, and only if you ask</h2>
             <p><strong>intervals.icu.</strong> If you paste your own intervals.icu API key into Settings, it is stored in this browser, and ERGatory uses it to send your finished rides (with their name, RPE, feel and notes) to your intervals.icu account and to read your planned workouts from it. That traffic goes straight from your browser to intervals.icu; ERGatory's server never sees it. Remove the key in Settings to stop.</p>
+            <p><strong>Strava.</strong> If you press Connect with Strava in Settings, Strava asks you to let ERGatory upload activities (and see your name). ERGatory then uploads each ride you finish to your Strava account, with its name and notes, and sends later edits of those. It reads nothing else from Strava. The access Strava grants is kept in this browser only. To complete the connection and to send rides, your browser goes through a small relay on ERGatory's server that adds the app's Strava credentials and passes the request on; it stores nothing, neither your access nor your rides. Disconnect in Settings revokes ERGatory's access at Strava and forgets it here; you can also revoke it on Strava under Settings → My Apps.</p>
             <p><strong>Files you download</strong> (a ride's .fit or image) go wherever you save them.</p>
 
             <h2>What the server sees</h2>
-            <p>The public ERGatory is a set of static files served by Cloudflare. Loading it is an ordinary web request, which Cloudflare handles under <a href="https://www.cloudflare.com/privacypolicy/">its privacy policy</a>. ERGatory itself keeps no logs and stores nothing about you. The page's font is loaded from Google Fonts, which sees that request.</p>
+            <p>The public ERGatory is a set of static files served by Cloudflare, plus the Strava relay described above. Loading it is an ordinary web request, which Cloudflare handles under <a href="https://www.cloudflare.com/privacypolicy/">its privacy policy</a>. ERGatory itself keeps no logs and stores nothing about you. The page's font is loaded from Google Fonts, which sees that request.</p>
             <p>The household copy (a separate, private address) additionally sends debug traces of its use to its own server and reads one room's sensors from a home automation system. The public version does neither.</p>
 
             <h2>Source</h2>
