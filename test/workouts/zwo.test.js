@@ -271,4 +271,14 @@ describe('Zwo', () => {
 
         expect(res).toStrictEqual(expected);
     });
+
+    test('Zwo.readToInterval with intervals.icu textevents (no timeoffset)', () => {
+        const input = `<workout_file><workout>
+            <SteadyState Power="0.677" Duration="60"><textevent message="Alcohol wipe the finger" duration="10"/></SteadyState>
+            <SteadyState Power="0.677" Duration="30"><textevent message="Prick, test the second drop" duration="10"/></SteadyState>
+        </workout></workout_file>`;
+        const res = zwo.readToInterval(input);
+        expect(res.intervals[0].steps[0].messages).toStrictEqual([{duration: 10, offset: 0, message: 'Alcohol wipe the finger'}]);
+        expect(res.intervals[1].steps[0].messages).toStrictEqual([{duration: 10, offset: 0, message: 'Prick, test the second drop'}]);
+    });
 });
