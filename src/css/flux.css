@@ -4163,3 +4163,141 @@ and (orientation: landscape) {
 html[data-flavor="public"] .home-only,
 html[data-flavor="public"] room-status { display: none !important; }
 html:not([data-flavor="public"]) .public-only { display: none !important; }
+
+/* Group rides (views/group-views.js): the group panel fills the live
+   chart's place, and on desktop takes more of the height from the workout
+   graph, since the riders are what's watched. */
+#graph-power {
+    position: relative;
+}
+@media only screen
+and (min-width: 1200px)
+and (min-height: 650px)
+and (orientation: landscape) {
+    body.group-mode #home-page-wrapper {
+        grid-template-rows: 0 minmax(0, 2.4fr) minmax(0, 0.8fr) auto 76px;
+    }
+}
+
+/* The Workouts page on desktop (views/workout-detail.js): the lists in a
+   column on the left, the workout picked from them large on the right, with
+   the group ride box under it. The editor puts its details beside the
+   intervals. Phones keep the single column above. */
+.wk--pane workout-detail { display: none; }
+@media only screen
+and (min-width: 1200px)
+and (min-height: 650px)
+and (orientation: landscape) {
+    #workouts-page {
+        --wk-list-w: clamp(420px, 34vw, 560px);
+        font-size: 16px;
+        text-align: left;
+    }
+    .wk--lists .list--heading--cont {
+        min-height: 0;
+    }
+    #workouts-page .library--switch--group {
+        justify-items: start;
+        grid-template-columns: repeat(3, max-content);
+        gap: 2.4em;
+        padding: 0 1.6em;
+        border-bottom: 1px solid var(--border-color);
+    }
+    #workouts-page .library--switch--heading {
+        line-height: 3.6em;
+    }
+
+    /* the two columns fill the screen between the tabs and the bottom bar
+       (65 px and 76 px) and scroll on their own */
+    #view--workouts-workouts.active {
+        display: grid;
+        grid-template-columns: var(--wk-list-w) minmax(0, 1fr);
+        height: calc(100vh - 141px);
+        overflow: hidden;
+    }
+    #view--workouts-workouts .wk--lists {
+        grid-column: 1;
+        grid-row: 1;
+        border-right: 1px solid var(--border-color);
+        overflow-y: auto;
+        min-height: 0;
+    }
+    #view--workouts-workouts .wk--pane {
+        grid-column: 2;
+        grid-row: 1;
+        overflow-y: auto;
+        min-height: 0;
+        padding: 1.8em 2.4em 2em;
+        box-sizing: border-box;
+    }
+    .wk--pane workout-detail { display: block; }
+    .wk--pane group-create { margin: 2em 0 0; }
+    .wk--pane group-create .gc--box { text-align: left; }
+
+    /* the lists, compact: the detail pane does the expanding */
+    .wk--lists .list--row--inner {
+        max-width: none;
+        padding: 0.9em 1.6em;
+    }
+    .wk--lists .list--sub-heading {
+        font-size: 0.85em;
+        letter-spacing: 0.08em;
+        opacity: 0.7;
+    }
+    .wk--lists .workout--full-info,
+    .wk--lists planned-list-item .details {
+        display: none !important;
+    }
+    .wk--lists .workout--summary {
+        grid-template-columns: minmax(0, 1fr) auto 4.2em 2.2em 1.8em;
+        gap: 0 0.9em;
+        padding: 0.85em 1.6em;
+        box-sizing: border-box;
+    }
+    .wk--lists .workout--name { font-size: 1.05em; }
+    .wk--lists .workout--type { font-size: 0.85em; opacity: 0.75; text-align: right; }
+    .wk--lists .workout--duration { font-size: 0.9em; opacity: 0.7; text-align: right; font-variant-numeric: tabular-nums; }
+    .wk--lists workout-item, .wk--lists planned-list-item {
+        display: block;
+        border-left: 3px solid transparent;
+        transition: background-color 0.12s;
+    }
+    .wk--lists workout-item:hover, .wk--lists planned-list-item:hover {
+        background-color: rgba(255, 255, 255, 0.03);
+    }
+    .wk--lists workout-item.previewed, .wk--lists planned-list-item.previewed {
+        background-color: rgba(255, 255, 255, 0.07);
+        border-left-color: var(--zone-blue, #328AFF);
+    }
+    .wk--lists .workout-loader {
+        padding: 1em 1.6em;
+    }
+
+    /* the editor: details on the left, intervals on the right */
+    #view--workouts-editor .editor-cont form {
+        display: grid;
+        grid-template-columns: minmax(320px, 30%) minmax(0, 1fr);
+        gap: 0 2.4em;
+        align-items: start;
+        max-width: 1500px;
+        margin: 0 auto;
+        padding: 1.6em 2.4em;
+        box-sizing: border-box;
+    }
+    #view--workouts-editor .editor--meta {
+        grid-column: 1;
+        grid-row: 1 / span 2;
+        border-radius: 10px;
+    }
+    #view--workouts-editor .editor--table,
+    #view--workouts-editor .editor--controls {
+        grid-column: 2;
+    }
+    #view--workouts-editor .editor--row,
+    #view--workouts-editor .editor--form--group {
+        max-width: none;
+    }
+    #view--workouts-editor .editor--header {
+        margin-top: 0;
+    }
+}

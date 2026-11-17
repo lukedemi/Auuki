@@ -16,3 +16,5 @@ env.js
 .parcel-cache/
 
 .wrangler/
+
+/workers/group/node_modules/

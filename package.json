@@ -31,5 +31,14 @@
         "msgpackr-extract": false,
         "unrs-resolver": false
     },
-    "name": "ergatory"
+    "name": "ergatory",
+    "dependencies": {
+        "@cloudflare/realtimekit": "2.0.4"
+    },
+    "targets": {
+        "default": {
+            "context": "browser",
+            "includeNodeModules": true
+        }
+    }
 }

@@ -1,0 +1,11 @@
+{
+    "private": true,
+    "name": "auuki-group",
+    "scripts": {
+        "dev": "wrangler dev --var DEV:1 --var TOKEN_SECRET:dev-secret-dev-secret",
+        "deploy": "node ../../scripts/deploy-group.mjs"
+    },
+    "devDependencies": {
+        "wrangler": "4.158.0"
+    }
+}
