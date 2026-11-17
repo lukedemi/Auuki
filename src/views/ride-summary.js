@@ -18,6 +18,7 @@ import { xf } from '../functions.js';
 import { models } from '../models/models.js';
 import direct from '../models/intervals-direct.js';
 import stravaDirect from '../models/strava-direct.js';
+import { flags } from '../flavor.js';
 import { roomSummary } from '../room.js';
 import { recordChart, cleanTitle, roomLine, cardModel, cardSvg, svgToPng, fileName as pngName, downloadBlob } from '../ride-card.js';
 
@@ -203,7 +204,7 @@ class RideSummary extends HTMLElement {
         if(finished && direct.isConfigured() && (record.summary.status?.intervals ?? 'none') !== 'success') {
             this.upload('intervals');
         }
-        if(finished && stravaDirect.isConnected() && (record.summary.status?.strava ?? 'none') !== 'success') {
+        if(finished && flags.strava && stravaDirect.isConnected() && (record.summary.status?.strava ?? 'none') !== 'success') {
             this.upload('strava');
         }
         try {
@@ -359,7 +360,7 @@ class RideSummary extends HTMLElement {
             if($h && id === this.rideId) $h.textContent = '✓ Saved';
             if(redraw && id === this.rideId) { this.renderImage(); }
             if(summary?.intervals_id) this.pushIntervals(summary);
-            if(summary?.strava_id) this.pushStrava(summary);
+            if(summary?.strava_id && flags.strava) this.pushStrava(summary);
         } catch(e) {
             if($h) $h.textContent = `Not saved: ${e.message}`;
         }
@@ -401,7 +402,7 @@ class RideSummary extends HTMLElement {
             const $el = this.querySelector(`[data-up="${service}"]`);
             if(!$el) continue;
             // Strava shows once the rider has connected it, or when the ride is already there
-            if(service === 'strava' && !stravaDirect.isConnected() && !this.summary.strava_id) { $el.innerHTML = ''; continue; }
+            if(service === 'strava' && !(flags.strava && stravaDirect.isConnected()) && !this.summary.strava_id) { $el.innerHTML = ''; continue; }
             const label = service === 'intervals' ? 'intervals.icu' : 'Strava';
             const state = this.uploading?.[service] ? 'loading' : (this.summary.status?.[service] ?? 'none');
             let note = '';

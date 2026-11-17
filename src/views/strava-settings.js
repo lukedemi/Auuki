@@ -15,6 +15,7 @@
 
 import { xf } from '../functions.js';
 import strava from '../models/strava-direct.js';
+import { flags, PUBLIC_URL } from '../flavor.js';
 import connectButton from 'url:../images/connections/strava/btn_strava_connect_with_orange.svg';
 import compatible from 'url:../images/connections/strava/api_logo_cptblWith_strava_horiz_white.svg';
 
@@ -43,6 +44,10 @@ class StravaSettings extends HTMLElement {
         }
         this.msg = null;
         this.clientId = null;
+        if(!flags.strava) {
+            this.innerHTML = `<p class="sv--note">Strava connects on the public ERGatory, <a class="a" href="${PUBLIC_URL}/">ergatory.d3-mi.com</a>, where its Strava app sends riders back. This household copy doesn't upload to Strava; your own rides reach it through bikes.</p>`;
+            return;
+        }
         this.render();
         // back from Strava?
         try {

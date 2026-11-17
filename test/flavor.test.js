@@ -19,7 +19,7 @@ describe('the two ERGatory builds', () => {
     });
     test('the household build has the room and the traces', () => {
         const { flags, APP_NAME } = require('../src/flavor.js');
-        expect(flags).toEqual({room: true, traces: true});
+        expect(flags).toEqual({room: true, traces: true, strava: false});
         expect(APP_NAME).toBe('ERGatory');
     });
 });
