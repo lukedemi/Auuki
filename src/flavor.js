@@ -10,10 +10,21 @@
 //           It never makes those calls or shows their settings, and it is
 //           deployed with no server functions at all.
 //
-// Set at build time: ERGATORY_FLAVOR=public (npm run release:public).
+// Set in the built page: <meta name="ergatory-flavor" content="home">, which
+// `npm run release:public` rewrites to "public" in dist-public/index.html
+// (scripts/flavor.mjs). The source is the same for both; only that line of
+// the build differs. Anything else, or no page, is the household build.
 //
 
-export const FLAVOR = process.env.ERGATORY_FLAVOR === 'public' ? 'public' : 'home';
+export function readFlavor(doc = (typeof document !== 'undefined' ? document : null)) {
+    try {
+        return doc?.querySelector('meta[name="ergatory-flavor"]')?.content === 'public' ? 'public' : 'home';
+    } catch(e) {
+        return 'home';
+    }
+}
+
+export const FLAVOR = readFlavor();
 
 export const flags = Object.freeze({
     room:   FLAVOR === 'home',

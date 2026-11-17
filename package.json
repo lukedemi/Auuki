@@ -10,7 +10,7 @@
         "starttls": "parcel --cert ./dev_cert/cert.pem --key ./dev_cert/key.pem",
         "build": "parcel build",
         "release": "rm -rf dist && parcel build --no-cache && node scripts/version.mjs dist && node scripts/source.mjs dist home",
-        "release:public": "rm -rf dist-public && ERGATORY_FLAVOR=public parcel build --dist-dir dist-public --no-cache && node scripts/version.mjs dist-public && node scripts/source.mjs dist-public public"
+        "release:public": "rm -rf dist-public && parcel build --dist-dir dist-public --no-cache && node scripts/flavor.mjs dist-public public && node scripts/version.mjs dist-public && node scripts/source.mjs dist-public public"
     },
     "devDependencies": {
         "@babel/core": "^7.29.7",
@@ -31,11 +31,5 @@
         "msgpackr-extract": false,
         "unrs-resolver": false
     },
-    "name": "ergatory",
-    "@parcel/transformer-js": {
-        "inlineEnvironment": [
-            "NODE_ENV",
-            "ERGATORY_FLAVOR"
-        ]
-    }
+    "name": "ergatory"
 }
