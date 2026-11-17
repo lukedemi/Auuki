@@ -17,6 +17,7 @@ import './time-left.js';
 import './fit-text.js';
 import './pause-overlay.js';
 import './ride-summary.js';
+import './ride-finished.js';
 import './watch.js';
 import './ant-device-scan.js';
 import './keyboard.js';
