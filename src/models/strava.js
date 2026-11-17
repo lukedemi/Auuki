@@ -1,5 +1,6 @@
 import { xf, once, } from '../functions.js';
 import { OAuthService, DialogMsg, stateParam, } from './enums.js';
+import stravaDirect from './strava-direct.js';
 import config from './config.js';
 
 function Strava(args = {}) {
@@ -88,7 +89,26 @@ function Strava(args = {}) {
         window.history.pushState({}, document.title, window.location.pathname);
     }
 
-    async function uploadWorkout(record) {
+    // ERGatory's own Strava connection (strava-direct.js) when the rider has
+    // made one; the ride's name and notes go with it, and the activity's id
+    // comes back on the record for the end screen's View on Strava.
+    // quiet: the background uploader's tries, which must not pop an error box.
+    async function uploadWorkout(record, {quiet = false} = {}) {
+        if(stravaDirect.isConnected()) {
+            try {
+                const res = await stravaDirect.upload(record.blob, {
+                    name: record.summary?.name,
+                    description: record.summary?.notes?.trim() || undefined,
+                    externalId: `ergatory-${record.id ?? record.summary?.id}`,
+                });
+                if(record.summary) record.summary.strava_id = res.activityId;
+                return ':success';
+            } catch(e) {
+                console.error(':strava :direct :upload :fail', e);
+                if(!quiet) xf.dispatch('ui:modal:error:open', `Strava upload failed: ${e.message}`);
+                return ':fail';
+            }
+        }
         const blob = record.blob;
         const workoutName = record.summary?.name ?? 'ERGatory ride';
         const url = `${api_uri}/api/strava/upload`;

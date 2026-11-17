@@ -33,6 +33,7 @@ activity-history .ah--icu { font-size: 14px; white-space: nowrap; }
 activity-history .ah--icu.ok { color: #6fdc9b; }
 activity-history .ah--icu.bad { color: #ff8c8c; }
 activity-history .ah--icu.none { opacity: 0.55; }
+activity-history .ah--strava { color: #FC5200; font-weight: 600; margin-left: 6px; }
 activity-history .ah--empty { opacity: 0.6; padding: 20px 0; }
 @media (max-width: 640px) {
     activity-history .ah--ride { grid-template-columns: 1fr auto; }
@@ -53,7 +54,7 @@ export function rowHtml(r) {
         <span><div class="ah--name">${esc(r.name)}</div><div class="ah--when">${esc(when(r.timestamp))}</div></span>
         <span class="ah--felt">${esc(felt)}</span>
         <span class="ah--dur">${hmm(r.duration)}</span>
-        <span class="ah--icu ${cls}">${text}</span>
+        <span class="ah--icu ${cls}">${text}${r.status?.strava === 'success' ? ' <span class="ah--strava">✓ Strava</span>' : r.status?.strava === 'loading' ? ' <span class="ah--strava">Strava…</span>' : ''}</span>
     </button>`;
 }
 
@@ -74,9 +75,9 @@ class ActivityHistory extends HTMLElement {
         xf.sub('activity:updated', (s) => { if(s?.id) { merge(s); this.render(); } }, signal);
         xf.sub('activity:deleted', (id) => { this.rides = this.rides.filter((r) => r.id !== id); this.render(); }, signal);
         xf.sub('activity:uploading', ({id, service} = {}) => {
-            if(service !== 'intervals') return;
+            if(service !== 'intervals' && service !== 'strava') return;
             const r = this.rides.find((x) => x.id === id);
-            if(r) { merge({id, status: Object.assign({}, r.status, {intervals: 'loading'})}); this.render(); }
+            if(r) { merge({id, status: Object.assign({}, r.status, {[service]: 'loading'})}); this.render(); }
         }, signal);
         this.addEventListener('click', (e) => {
             const id = e.target.closest?.('[data-id]')?.dataset.id;

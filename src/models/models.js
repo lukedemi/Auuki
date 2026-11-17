@@ -752,6 +752,7 @@ class Activity extends Model {
                 const fresh = (await this.get(id)) ?? record;
                 fresh.summary.status[service] = res.substring(1);
                 if(record.summary.intervals_id) fresh.summary.intervals_id = record.summary.intervals_id;
+                if(record.summary.strava_id) fresh.summary.strava_id = record.summary.strava_id;
                 await idb.put('activity', fresh);
                 return fresh;
             });

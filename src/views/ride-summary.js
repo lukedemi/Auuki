@@ -17,6 +17,7 @@
 import { xf } from '../functions.js';
 import { models } from '../models/models.js';
 import direct from '../models/intervals-direct.js';
+import stravaDirect from '../models/strava-direct.js';
 import { roomSummary } from '../room.js';
 import { recordChart, cleanTitle, roomLine, cardModel, cardSvg, svgToPng, fileName as pngName, downloadBlob } from '../ride-card.js';
 
@@ -82,6 +83,7 @@ ride-summary .rs--up button { min-width: 220px; white-space: nowrap; }
 ride-summary .rs--up .ok { color: #6fdc9b; }
 ride-summary .rs--up .bad { color: #ff8c8c; }
 ride-summary .rs--up a { color: #8ab8ff; }
+ride-summary .rs--up a.rs--strava-link { color: #FC5200; font-weight: 700; }
 ride-summary .rs--files { margin-top: 10px; }
 ride-summary .rs--delete { margin-left: auto; opacity: 0.8; }
 ride-summary .rs--delete.confirm { background: #eb5757; border-color: #eb5757; color: #fff; opacity: 1; }
@@ -201,6 +203,9 @@ class RideSummary extends HTMLElement {
         if(finished && direct.isConfigured() && (record.summary.status?.intervals ?? 'none') !== 'success') {
             this.upload('intervals');
         }
+        if(finished && stravaDirect.isConnected() && (record.summary.status?.strava ?? 'none') !== 'success') {
+            this.upload('strava');
+        }
         try {
             const workout = record.chart?.t?.length ? null : await plannedWorkoutFor(record.summary);
             this.chart = await recordChart(record, {workout, toAbsolute: (v, ftp) => models.ftp.toAbsolute(v, ftp)});
@@ -251,6 +256,7 @@ class RideSummary extends HTMLElement {
                     <section>
                         <h3>Upload</h3>
                         <div class="rs--up" data-up="intervals"></div>
+                        <div class="rs--up" data-up="strava"></div>
                     </section>
                 </div>
             </div>
@@ -353,6 +359,7 @@ class RideSummary extends HTMLElement {
             if($h && id === this.rideId) $h.textContent = '✓ Saved';
             if(redraw && id === this.rideId) { this.renderImage(); }
             if(summary?.intervals_id) this.pushIntervals(summary);
+            if(summary?.strava_id) this.pushStrava(summary);
         } catch(e) {
             if($h) $h.textContent = `Not saved: ${e.message}`;
         }
@@ -373,12 +380,28 @@ class RideSummary extends HTMLElement {
         }, 1000);
     }
 
+    // the name and notes follow the ride onto Strava, a second after the last edit
+    pushStrava(summary) {
+        if(!stravaDirect.isConnected()) return;
+        clearTimeout(this.stravaTimer);
+        this.stravaTimer = setTimeout(async () => {
+            try {
+                await stravaDirect.updateActivity(summary.strava_id, {name: summary.name, description: summary.notes ?? ''});
+            } catch(e) {
+                const $h = this.querySelector('[data-hint="saved"]');
+                if($h && summary.id === this.rideId) $h.textContent = `✓ Saved here; Strava did not take the edit (${e.message})`;
+            }
+        }, 1000);
+    }
+
     // ------------------------------------------------------------ uploads
 
     renderUploads() {
-        for(const service of ['intervals']) {
+        for(const service of ['intervals', 'strava']) {
             const $el = this.querySelector(`[data-up="${service}"]`);
             if(!$el) continue;
+            // Strava shows once the rider has connected it, or when the ride is already there
+            if(service === 'strava' && !stravaDirect.isConnected() && !this.summary.strava_id) { $el.innerHTML = ''; continue; }
             const label = service === 'intervals' ? 'intervals.icu' : 'Strava';
             const state = this.uploading?.[service] ? 'loading' : (this.summary.status?.[service] ?? 'none');
             let note = '';
@@ -386,8 +409,11 @@ class RideSummary extends HTMLElement {
             if(state === 'loading') { button = 'Uploading…'; }
             else if(state === 'success') {
                 button = `Re-upload to ${label}`;
+                // Strava's guidelines: the link reads "View on Strava", bold, in #FC5200
                 const link = service === 'intervals' && this.summary.intervals_id
-                    ? ` · <a href="https://intervals.icu/activities/${esc(this.summary.intervals_id)}" target="_blank" rel="noopener">open</a>` : '';
+                    ? ` · <a href="https://intervals.icu/activities/${esc(this.summary.intervals_id)}" target="_blank" rel="noopener">open</a>`
+                    : service === 'strava' && this.summary.strava_id
+                    ? ` · <a class="rs--strava-link" href="${esc(stravaDirect.activityUrl(this.summary.strava_id))}" target="_blank" rel="noopener">View on Strava</a>` : '';
                 note = `<span class="ok">✓ On ${label}</span>${link}`;
             } else if(state === 'fail') { button = `Retry ${label}`; note = '<span class="bad">Upload failed</span>'; }
             $el.innerHTML = `<button type="button" ${state === 'loading' ? 'disabled' : ''}>${button}</button><span>${note}</span>`;
