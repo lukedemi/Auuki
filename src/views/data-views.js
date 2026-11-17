@@ -1799,14 +1799,18 @@ class AutoStart extends AutoPause {
 
 customElements.define('auto-start', AutoStart);
 
-// Settings > Power Match: On by default; only acts when the power source is
-// the Bluetooth power meter (see power-match.js)
+// Settings > Power Match: On by default. It also picks whose power is shown
+// and recorded (rider, Nov 17, 2026: "if power match is off, it shouldn't
+// have anything to do with the pedals"): on, the pedals (power-match.js
+// steers the trainer by them); off, the trainer's own reading.
+export const POWER_MATCH_ON  = {powerMatch: true,  power: 'ble:powerMeter'};
+export const POWER_MATCH_OFF = {powerMatch: false, power: 'ble:controllable'};
 class PowerMatchSetting extends AutoPause {
     postInit() {
         this.effect  = 'sources';
         this.key     = 'powerMatch';
         this.state   = true;
-        this.values  = {on: {powerMatch: true}, off: {powerMatch: false}};
+        this.values  = {on: POWER_MATCH_ON, off: POWER_MATCH_OFF};
     }
     onUpdate(value) {
         this.state = value[this.key] ?? true;

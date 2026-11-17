@@ -12,6 +12,8 @@ import { models } from '../src/models/models.js';
 import direct from '../src/models/intervals-direct.js';
 import '../src/views/pause-overlay.js';
 import { plannedWorkoutFor } from '../src/views/ride-summary.js';
+import '../src/views/ride-finished.js';
+import { POWER_MATCH_ON, POWER_MATCH_OFF } from '../src/views/data-views.js';
 
 const start = Date.UTC(2026, 10, 13, 16, 0, 0);
 function rideDb(n, name = '📊 Capped sub-threshold — 5x8min') {
@@ -156,5 +158,55 @@ describe('an older ride finds the workout it followed', () => {
         expect(w.meta.name).toBe('📊 Capped sub-threshold — 5x8min ≤ 3.0 mmol');
         expect(await plannedWorkoutFor(summary, {loaded: null, events: async () => [{name: 'Other'}]})).toBe(null);
         localStorage.removeItem('intervals-direct');
+    });
+});
+
+describe('Power Match off is the trainer\'s power', () => {
+    test('the switch moves the power source with it', async () => {
+        expect(POWER_MATCH_OFF).toEqual({powerMatch: false, power: 'ble:controllable'});
+        expect(POWER_MATCH_ON).toEqual({powerMatch: true, power: 'ble:powerMeter'});
+    });
+});
+
+describe('a finished ride closes the home screen', () => {
+    test('shown on save; keys held; the trainer let go; only Start a new ride opens it', async () => {
+        jest.useFakeTimers();
+        const el = document.createElement('ride-finished');
+        document.body.appendChild(el);
+        const targets = [], starts = [];
+        xf.sub('ui:power-target-set', (v) => targets.push(v));
+        xf.sub('ui:watchStart', () => starts.push(1));
+        window.addEventListener('keydown', (e) => { if(e.code === 'Space') xf.dispatch('ui:watchStart'); });
+
+        xf.dispatch('activity:add', {id: 'r1', name: 'Capped sub-threshold', timestamp: Date.now(), duration: 5400, status: {intervals: 'none'}});
+        expect(el.classList.contains('on')).toBe(true);
+        expect(el.textContent).toContain('Workout complete');
+        expect(el.textContent).toContain('Capped sub-threshold · 1:30');
+        jest.advanceTimersByTime(2000);
+        expect(targets.filter((t) => t === 0).length).toBe(2);
+
+        window.dispatchEvent(new KeyboardEvent('keydown', {code: 'Space'}));
+        expect(starts.length).toBe(0);
+
+        xf.dispatch('activity:uploading', {id: 'r1', service: 'intervals'});
+        expect(el.textContent).toContain('uploading…');
+        xf.dispatch('activity:updated', {id: 'r1', status: {intervals: 'success'}});
+        expect(el.textContent).toContain('✓ intervals.icu');
+
+        el.querySelector('[data-act="new"]').click();
+        expect(el.classList.contains('on')).toBe(false);
+        window.dispatchEvent(new KeyboardEvent('keydown', {code: 'Space'}));
+        expect(starts.length).toBe(1);
+        el.remove();
+        jest.useRealTimers();
+    });
+
+    test('a ride that did not save still closes it, and says so', async () => {
+        const el = document.createElement('ride-finished');
+        document.body.appendChild(el);
+        xf.dispatch('activity:save:fail', 'the ride did not save to this browser, so its .fit was downloaded instead');
+        expect(el.classList.contains('on')).toBe(true);
+        expect(el.textContent).toContain('did not save');
+        el.remove();
     });
 });

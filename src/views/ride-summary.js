@@ -35,6 +35,7 @@ ride-summary .rs--card {
     background: var(--background-color, #1b1d22); border: 1px solid var(--border-color, #333); border-radius: 16px;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55); text-align: left; font-size: 16px;
 }
+ride-summary .rs--finished { font: 800 34px/1.1 system-ui, sans-serif; color: #6fdc9b; margin: 0 0 10px; }
 ride-summary .rs--top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 ride-summary .rs--saved { font-size: 15px; padding: 4px 12px; border-radius: 999px; background: rgba(39, 174, 96, 0.18); color: #6fdc9b; }
 ride-summary .rs--saved.bad { background: rgba(235, 87, 87, 0.2); color: #ff8c8c; }
@@ -126,7 +127,7 @@ class RideSummary extends HTMLElement {
         this.rideId = null;
         this.summary = null;
 
-        xf.sub('activity:add', (s) => { if(s?.id) this.open(s.id); }, signal);
+        xf.sub('activity:add', (s) => { if(s?.id) this.open(s.id, {finished: true}); }, signal);
         xf.sub('activity:save:fail', (msg) => this.openFailed(msg), signal);
         xf.sub('ui:ride-summary:open', (id) => this.open(id), signal);
         xf.sub('activity:updated', (s) => { if(s?.id === this.rideId) { this.summary = s; this.renderUploads(); } }, signal);
@@ -157,15 +158,23 @@ class RideSummary extends HTMLElement {
         this.classList.add('open');
     }
 
-    async open(id) {
+    // finished: the ride just ended (not reopened from the list). It says so
+    // at the top, and goes to intervals.icu by itself (rider, Nov 17, 2026:
+    // "it doesn't seem like it pushed it to intervals"); the upload's
+    // external id makes a second one a no-op.
+    async open(id, {finished = false} = {}) {
         const record = await models.activity.get(id);
         if(!record) return;
         this.rideId = id;
         this.record = record;
         this.summary = record.summary;
         this.chart = null;
+        this.finished = finished;
         this.render();
         this.classList.add('open');
+        if(finished && direct.isConfigured() && (record.summary.status?.intervals ?? 'none') !== 'success') {
+            this.upload('intervals');
+        }
         try {
             const workout = record.chart?.t?.length ? null : await plannedWorkoutFor(record.summary);
             this.chart = await recordChart(record, {workout, toAbsolute: (v, ftp) => models.ftp.toAbsolute(v, ftp)});
@@ -180,6 +189,7 @@ class RideSummary extends HTMLElement {
         const s = this.summary;
         const when = new Date(s.timestamp).toLocaleString([], {weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'});
         this.innerHTML = `<div class="rs--card">
+            ${this.finished ? `<div class="rs--finished">✓ Workout complete</div>` : ''}
             <div class="rs--top">
                 <span class="rs--saved">✓ Saved on this computer</span>
                 <span style="opacity:0.6">${esc(when)}</span>
@@ -361,6 +371,7 @@ class RideSummary extends HTMLElement {
         await this.flush();
         const id = this.rideId;
         this.uploading = Object.assign(this.uploading ?? {}, {[service]: true});
+        xf.dispatch('activity:uploading', {id, service});
         this.renderUploads();
         try {
             await models.activity.upload(service, id);

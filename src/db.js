@@ -461,6 +461,11 @@ xf.reg('app:start', async function(_, db) {
     db.dataTileSwitch = models.dataTileSwitch.set(models.dataTileSwitch.restore()),
 
     db.sources = models.sources.set(models.sources.restore());
+    // Power Match off means the trainer's power, never the pedals' (data-views.js PowerMatchSetting)
+    if(db.sources.powerMatch === false && db.sources.power === 'ble:powerMeter') {
+        db.sources = models.sources.set(db.sources, {power: 'ble:controllable'});
+        models.sources.backup(db.sources);
+    }
 
     // IndexedDB Schema Version 4 (chunks: the ride in progress)
     await idb.start('store', 4, ['session', 'workouts', 'activity', 'chunks']);
