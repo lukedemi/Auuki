@@ -546,7 +546,7 @@ class GroupCreate extends HTMLElement {
             });
             const body = await res.json().catch(() => ({}));
             if(!res.ok) throw new Error(body.error ?? `failed (${res.status})`);
-            const guest = rideLink(location.origin, body.id, body.joinKey);
+            const guest = rideLink(body.guestOrigin || location.origin, body.id, body.joinKey);
             const mine = rideLink(location.origin, body.id, body.joinKey, body.hostKey);
             $msg.innerHTML = `<div>Send this link to everyone riding (they can join from 15 minutes before the start):</div>
                 <div class="gc--row"><input type="text" class="gc--link" readonly value="${esc(guest)}">

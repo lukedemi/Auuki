@@ -102,7 +102,9 @@ async function create(request, env) {
         body: JSON.stringify({id, title, workout: JSON.parse(frozen), timeline: tl, startAt, lobbyS: LOBBY_S}),
     });
     if(!res.ok) return fail(500, 'could not start the ride');
-    return json({id, joinKey, hostKey, startAt, durationS: tl.durationS});
+    // guests have no household login, so their link is on the open
+    // hostname (GUEST_ORIGIN); the host's stays on the household one
+    return json({id, joinKey, hostKey, startAt, durationS: tl.durationS, guestOrigin: env.GUEST_ORIGIN || null});
 }
 
 // ---- join ----
