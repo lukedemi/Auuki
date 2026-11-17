@@ -10,6 +10,7 @@
 //
 
 import { xf, exists } from './functions.js';
+import { flags } from './flavor.js';
 
 const POLL_MS = 30000;
 const LOG_EVERY_S = 60;
@@ -79,7 +80,7 @@ function Room(args = {}) {
 }
 
 const room = Room();
-if(typeof window !== 'undefined' && typeof document !== 'undefined' && typeof fetch === 'function' && !globalThis.__AUUKI_NO_ROOM__) {
+if(flags.room && typeof window !== 'undefined' && typeof document !== 'undefined' && typeof fetch === 'function' && !globalThis.__AUUKI_NO_ROOM__) {
     room.start();
 }
 

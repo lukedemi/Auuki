@@ -307,7 +307,7 @@ function Editor() {
     let workout = {
         meta: {
             name: 'New Workout',
-            author: 'Auuki',
+            author: 'ERGatory',
             category: 'SweetSpot',
             description: 'Best workout ever!',
             type: 'bike',

@@ -90,7 +90,7 @@ function Strava(args = {}) {
 
     async function uploadWorkout(record) {
         const blob = record.blob;
-        const workoutName = record.summary?.name ?? 'Powered by Auuki workout';
+        const workoutName = record.summary?.name ?? 'ERGatory ride';
         const url = `${api_uri}/api/strava/upload`;
 
         const formData = new FormData();

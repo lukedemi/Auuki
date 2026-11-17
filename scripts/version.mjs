@@ -12,5 +12,6 @@ const sha   = git('rev-parse --short HEAD');
 const dirty = git('status --porcelain -- src') ? '-dirty' : '';
 const built = new Date().toISOString().slice(0, 16).replace('T', ' ') + 'Z';
 
-writeFileSync('dist/version.json', JSON.stringify({sha: sha + dirty, built}) + '\n');
+const dist = process.argv[2] ?? 'dist';
+writeFileSync(`${dist}/version.json`, JSON.stringify({sha: sha + dirty, built}) + '\n');
 console.log(`version.json: ${sha}${dirty} ${built}`);
