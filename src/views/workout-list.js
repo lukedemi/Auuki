@@ -165,6 +165,7 @@ class WorkoutListItem extends HTMLElement {
         this.viewPort = this.getViewPort();
 
         xf.sub('db:workout', this.onWorkout.bind(this), this.signal);
+        xf.sub('ui:workout:preview', (p) => this.classList.toggle('previewed', p?.source === 'library' && p.id === this.id), this.signal);
         this.summary.addEventListener('pointerup', this.toggleExpand.bind(this), this.signal);
         this.optionsBtn.addEventListener('pointerup', this.toggleOptions.bind(this), this.signal);
         this.selectBtn.addEventListener('pointerup', this.onRadio.bind(this), this.signal);
@@ -183,6 +184,8 @@ class WorkoutListItem extends HTMLElement {
         if(e.target.classList.contains('workout--options')) {
             return;
         }
+        // desktop shows it beside the list (workout-detail.js)
+        xf.dispatch('ui:workout:preview', {source: 'library', id: this.id});
         if(this.isExpanded) {
             this.collapse();
         } else {

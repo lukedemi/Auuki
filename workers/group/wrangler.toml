@@ -1,0 +1,30 @@
+# auuki-group: the group-ride API and its Durable Object (one per ride).
+# The Pages site reaches it over a service binding (../../wrangler.toml).
+# Deploy with ../../scripts/deploy-group.mjs, which refuses during a ride.
+# Secrets: TOKEN_SECRET, and for video RTK_ACCOUNT_ID, RTK_APP_ID, RTK_API_TOKEN.
+name = "auuki-group"
+main = "src/index.js"
+compatibility_date = "2026-11-01"
+workers_dev = false
+
+[[durable_objects.bindings]]
+name = "GROUP"
+class_name = "GroupRide"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["GroupRide"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "auuki"
+database_id = "2bc64c33-b33e-4a39-a47e-ef1754f39ca0"
+
+[vars]
+RTK_PRESET = "group_call_participant"
+# where guests open a ride: the auuki-ride Pages project (the same build),
+# which Access lets everyone reach (doc/group-ride.md § Joining)
+GUEST_ORIGIN = "https://ride.d3-mi.com"
+
+[observability]
+enabled = true

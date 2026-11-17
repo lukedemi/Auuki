@@ -10,6 +10,7 @@ import './auto-upload.js';
 import './ble/devices.js';
 import './ble/obc/controls.js';
 import './watch.js';
+import './group/start.js';
 import './course.js';
 import './lock.js';
 

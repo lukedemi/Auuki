@@ -9,3 +9,9 @@ compatibility_date = "2026-11-01"
 binding = "DB"
 database_name = "auuki"
 database_id = "2bc64c33-b33e-4a39-a47e-ef1754f39ca0"
+
+# Group rides: /api/group/* and /api/host/group go to this Worker
+# (workers/group), which holds the rides' Durable Objects.
+[[services]]
+binding = "GROUP_API"
+service = "auuki-group"

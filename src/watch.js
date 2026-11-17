@@ -39,6 +39,9 @@ class Watch {
         this.hasBeenAutoPaused = false;
         this.autoPause         = true;
         this.autoStart         = true;
+        // a group ride (group/group.js) moves the workout by the group's
+        // clock; the watch only records
+        this.groupMode         = false;
         this.init();
     }
     init() {
@@ -57,6 +60,7 @@ class Watch {
             self.state = state;
         });
         xf.sub('db:cadence',         rpm => { self.cadence = rpm; });
+        xf.sub('db:groupMode',          on => { self.groupMode     = on; });
         xf.sub('db:workoutStatus',   state => {
             self.stateWorkout = state;
 
@@ -66,9 +70,12 @@ class Watch {
 
             if(self.isWorkoutDone()) {
                 xf.dispatch('watch:lap');
-                // reset to slope mode 0% when workout is done
-                xf.dispatch('ui:slope-target-set', 0);
-                xf.dispatch('ui:mode-set', ControlMode.sim);
+                // reset to slope mode 0% when workout is done; a group ride
+                // goes on into its cooldown in ERG, at the last target
+                if(!self.groupMode) {
+                    xf.dispatch('ui:slope-target-set', 0);
+                    xf.dispatch('ui:mode-set', ControlMode.sim);
+                }
                 console.log(`Workout done!`);
             }
         });
@@ -172,7 +179,8 @@ class Watch {
             if(this.autoStartCounter === 0) {
                 this.autoStartCounter = -1;
                 xf.dispatch(`ui:watchStart`);
-                xf.dispatch('ui:workoutStart');
+                // in a group ride the workout starts at the group's time
+                if(!this.groupMode) xf.dispatch('ui:workoutStart');
                 xf.dispatch(`ui:autoStartCounter`, -1);
                 return;
             }
@@ -203,6 +211,9 @@ class Watch {
     }
     startWorkout() {
         const self = this;
+
+        // the group's clock starts a group ride's workout (group/group.js)
+        if(self.groupMode) return;
 
         // in case of pressing play button during auto start countdown
         this.autoStartCounter = -1;
@@ -295,7 +306,8 @@ class Watch {
                 xf.dispatch('workout:stopped');
             }
 
-            self.lap();
+            // the last lap; a group ride's lap() is locked, so record it here
+            if(self.groupMode) xf.dispatch('watch:lap'); else self.lap();
 
             // should be called after event and lap are created
             xf.dispatch('watch:stopped');
@@ -311,6 +323,15 @@ class Watch {
     onTick() {
         const self   = this;
         let elapsed  = self.elapsed + 1;
+
+        // a group ride's workout: the interval, step and time left come from
+        // the group's clock (group/group.js); this only records
+        if(self.groupMode && self.isWorkoutStarted()) {
+            xf.dispatch('watch:elapsed', elapsed);
+            self.dispatchTextEvent();
+            return;
+        }
+
         let lapTime  = self.lapTime;
         let stepTime = self.stepTime;
 
@@ -359,6 +380,9 @@ class Watch {
     }
     lap() {
         const self = this;
+
+        // no skipping in a group ride: everyone rides the same interval
+        if(self.groupMode && self.isWorkoutStarted()) return;
 
         if(self.isWorkoutStarted()) {
             let i             = self.intervalIndex;
@@ -417,6 +441,8 @@ class Watch {
     }
     back() {
         const self = this;
+
+        if(self.groupMode && self.isWorkoutStarted()) return;
 
         if(self.isWorkoutStarted()) {
             let i             = self.intervalIndex;
@@ -491,6 +517,8 @@ xf.reg('watch:intervalIndex', (index, db) => db.intervalIndex    = index);
 xf.reg('ui:interval-extend', (seconds, db) => {
     const add = Number(seconds) > 0 ? Number(seconds) : 300;
     if(db.workoutStatus !== 'started') return;
+    // a group ride's workout is the same for everyone, start to finish
+    if(db.groupMode) return;
     const i = db.intervalIndex;
     const res = extendInterval(db.workout, i, add);
     if(!res) return;

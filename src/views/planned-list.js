@@ -205,6 +205,7 @@ class PlannedListItem extends HTMLElement {
 
         xf.sub(`action:li:${self.wid}`, self.onAction.bind(self), self.signal);
         xf.sub('db:workout',  self.onWorkout.bind(self), self.signal);
+        xf.sub('ui:workout:preview', (p) => self.classList.toggle('previewed', p?.source === 'planned' && p.id === self.wid), self.signal);
     }
     disconnectedCallback() {
         this.abortController.abort();
@@ -256,6 +257,8 @@ class PlannedListItem extends HTMLElement {
         // TODO: delete
     }
     onToggle() {
+        // desktop shows it beside the list (workout-detail.js)
+        xf.dispatch('ui:workout:preview', {source: 'planned', id: this.wid});
         this.isExpanded ? this.collapse() : this.expand();
     }
     onOptions() {

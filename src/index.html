@@ -313,6 +313,8 @@
                                  <z-stack-item class="active"> -->
                                     <live-chart></live-chart>
                                     <room-status></room-status>
+                                    <!-- a group ride, in place of the live chart (views/group-views.js) -->
+                                    <group-panel></group-panel>
                                     <!-- the Moxy strip, kept but hidden: no Moxy here, and its power
                                          trace was a 1 px/s line on a 0–600 W scale -->
                                     <moxy-graph class="graph--cont" style="display:none">
@@ -590,6 +592,14 @@
 
                 <!-- workout-list -->
                 <div id="view--workouts-workouts" class="workout-list sub-tab active">
+                    <!-- desktop: the workout you picked, large, beside the lists
+                         (views/workout-detail.js); on a phone only the group
+                         ride box shows, above the lists, as before -->
+                    <div class="wk--pane">
+                        <workout-detail></workout-detail>
+                        <group-create></group-create>
+                    </div>
+                    <div class="wk--lists">
                     <div class="list--sub-section">
                         <div class="list--row--outer">
                             <div class="list--row--inner list--heading--cont control">
@@ -653,6 +663,7 @@
                         </div>
                     </div>
                     <br/><br/><br/>
+                    </div> <!-- wk--lists -->
                 </div> <!-- workout-list -->
             </div>
 
@@ -1855,6 +1866,7 @@
 
         <power-match-debug></power-match-debug>
         <session-notice></session-notice>
+        <group-join></group-join>
         <pause-overlay></pause-overlay>
         <ride-summary></ride-summary>
         <ride-finished></ride-finished>
