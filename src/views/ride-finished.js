@@ -36,8 +36,8 @@ ride-finished .rf--ride {
     padding: 14px 16px; border-radius: 12px; background: #1b1e24; border: 1px solid #2c3038; font-weight: 500;
 }
 ride-finished .rf--ride.latest { border-color: #6fdc9b; }
-ride-finished .rf--name { font-size: 17px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-ride-finished .rf--when { font-size: 14px; opacity: 0.65; font-weight: 400; }
+ride-finished .rf--name { font-size: 17px; line-height: 1.3; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+ride-finished .rf--when { font-size: 14px; line-height: 1.4; opacity: 0.65; font-weight: 400; margin-top: 2px; }
 ride-finished .rf--dur { font-variant-numeric: tabular-nums; opacity: 0.85; }
 ride-finished .rf--icu { font-size: 14px; white-space: nowrap; }
 ride-finished .rf--icu.ok { color: #6fdc9b; }

@@ -83,6 +83,8 @@ ride-summary .rs--up .ok { color: #6fdc9b; }
 ride-summary .rs--up .bad { color: #ff8c8c; }
 ride-summary .rs--up a { color: #8ab8ff; }
 ride-summary .rs--files { margin-top: 10px; }
+ride-summary .rs--delete { margin-left: auto; opacity: 0.8; }
+ride-summary .rs--delete.confirm { background: #eb5757; border-color: #eb5757; color: #fff; opacity: 1; }
 `;
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
@@ -142,9 +144,33 @@ class RideSummary extends HTMLElement {
     }
 
     close() {
-        this.flush();
+        const wasOpen = this.classList.contains('open');
+        // the last edits written first, then the uploader (auto-upload.js) told
+        Promise.resolve(this.flush()).finally(() => { if(wasOpen) xf.dispatch('ui:ride-summary:closed', this.rideId); });
         this.classList.remove('open');
+        this.disarmDelete?.();
         if(this.imgUrl) { URL.revokeObjectURL(this.imgUrl); this.imgUrl = null; }
+    }
+
+    // Delete: a second tap within 4 s; gone from this browser, not from intervals.icu
+    onDelete($btn) {
+        if($btn.classList.contains('confirm')) {
+            const id = this.rideId;
+            this.disarmDelete();
+            this.pending = null;
+            xf.dispatch('ui:activity:delete', id);
+            this.rideId = null;
+            this.close();
+            return;
+        }
+        $btn.classList.add('confirm');
+        $btn.textContent = 'Tap again to delete';
+        this.deleteTimer = setTimeout(() => this.disarmDelete(), 4000);
+    }
+    disarmDelete() {
+        clearTimeout(this.deleteTimer);
+        const $btn = this.querySelector('[data-file="delete"]');
+        if($btn) { $btn.classList.remove('confirm'); $btn.textContent = 'Delete ride'; }
     }
 
     openFailed(msg) {
@@ -204,6 +230,7 @@ class RideSummary extends HTMLElement {
                     <div class="rs--row rs--files">
                         <button type="button" data-file="png">Save image</button>
                         <button type="button" data-file="fit">Download .fit</button>
+                        <button type="button" data-file="delete" class="rs--delete">Delete ride</button>
                     </div>
                 </div>
                 <div>
@@ -247,6 +274,7 @@ class RideSummary extends HTMLElement {
         });
         this.querySelector('[data-file="png"]').onclick = (e) => this.savePng(e.currentTarget);
         this.querySelector('[data-file="fit"]').onclick = () => models.activity.download(this.rideId);
+        this.querySelector('[data-file="delete"]').onclick = (e) => this.onDelete(e.currentTarget);
         this.renderScales();
         this.renderUploads();
     }

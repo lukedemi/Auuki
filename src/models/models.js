@@ -597,7 +597,8 @@ class Activity extends Model {
     name = 'activity';
     postInit(args) {
         this.api = args.api;
-        this.capacity = 7;
+        // rides kept in this browser (upstream kept 7; the Activities tab wants a history, Nov 17, 2026)
+        this.capacity = 100;
     }
     defaultValue() { return []; }
     // Stopping saves the ride: no save button (rider, Nov 13, 2026: "You
@@ -718,7 +719,26 @@ class Activity extends Model {
     remove(id) {
         idb.remove('activity', id);
     }
-    async upload(service, id) {
+    // gone from this browser: IndexedDB and the list (the end screen's Delete)
+    async delete(id, db = null) {
+        await this.serial(() => idb.remove('activity', id));
+        if(Array.isArray(db?.activity)) {
+            const i = db.activity.findIndex((a) => a.id === id);
+            if(i >= 0) db.activity.splice(i, 1);
+        }
+        xf.dispatch('activity:deleted', id);
+    }
+    // One upload of a ride to a service at a time: the end screen and the
+    // background uploader (auto-upload.js) asking together share it.
+    upload(service, id, opts = {}) {
+        this.inflight = this.inflight ?? new Map();
+        const key = `${service}:${id}`;
+        if(this.inflight.has(key)) return this.inflight.get(key);
+        const p = this.uploadOnce(service, id, opts).finally(() => this.inflight.delete(key));
+        this.inflight.set(key, p);
+        return p;
+    }
+    async uploadOnce(service, id, opts = {}) {
         const record = await this.get(id);
         if(!record) return ':fail';
 
@@ -727,7 +747,7 @@ class Activity extends Model {
            service === 'trainingPeaks') {
 
             // uploadWorkout may note what the service called it on record.summary (intervals_id)
-            const res = await this.api[service].uploadWorkout(record);
+            const res = await this.api[service].uploadWorkout(record, opts);
             const fresh = await this.serial(async () => {
                 const fresh = (await this.get(id)) ?? record;
                 fresh.summary.status[service] = res.substring(1);

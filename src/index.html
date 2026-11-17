@@ -440,6 +440,13 @@
                         topic=":nav"
                     >Ride report
                     </navigation-action>
+                    <navigation-action
+                        id="link--workouts-activities"
+                        class="library--switch--heading"
+                        action="workouts:activities"
+                        topic=":nav"
+                    >Activities
+                    </navigation-action>
                 </div>
                 <workout-editor id="view--workouts-editor" class="sub-tab">
                     <div class="editor-cont">
@@ -528,6 +535,8 @@
                 </workout-editor>
 
                 <!-- ride-report -->
+                <activity-history id="view--workouts-activities" class="sub-tab"></activity-history>
+
                 <div id="view--workouts-report" class="ride-report sub-tab">
 
                     <power-in-zone id="power-in-zone">
@@ -608,16 +617,7 @@
                         </planned-list>
                     </div> <!-- list--sub-section -->
 
-                    <!-- activites -->
-                    <div class="list--sub-section">
-                        <div class="list--row--outer">
-                            <div class="list--row--inner list--heading--cont">
-                                <h2 class="list--sub-heading">Activities</h2>
-                            </div>
-                        </div>
-                        <activity-list class="activity--list">
-                        </activity-list>
-                    </div> <!-- end activities -->
+                    <!-- activities: their own tab now, Workouts > Activities (activity-history.js) -->
 
                     <div class="list--sub-section">
                         <div class="list--row--outer">
