@@ -97,7 +97,7 @@ function Intervals(args = {}) {
     // quiet: the background uploader's tries, which must not pop an error box
     async function uploadWorkout(record, {quiet = false} = {}) {
         const blob = record.blob;
-        const workoutName = record.summary?.name ?? 'Powered by Auuki workout';
+        const workoutName = record.summary?.name ?? 'ERGatory ride';
 
         if(direct.isConfigured()) {
             try {

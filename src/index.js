@@ -1,4 +1,6 @@
 import { xf } from './functions.js';
+import { FLAVOR } from './flavor.js';
+if(typeof document !== 'undefined') document.documentElement.dataset.flavor = FLAVOR;
 import './trace.js';           // first, so it sees every console line
 import './db.js';
 import './views/views.js';

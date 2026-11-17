@@ -1,8 +1,29 @@
 <img alt="Auuki Indoor Cyling app for Structured Training" src="https://github.com/user-attachments/assets/292a3216-2f52-4994-9b15-614446e41912" />
 
-# This fork (lukedemi/Auuki)
+# ERGatory (lukedemi/Auuki)
 
-Self-hosted at **auuki.d3-mi.com** (Cloudflare Pages, behind Access). Changes on top of upstream:
+**ERGatory** is this fork's name since Nov 17, 2026 (rider's call; "Auuki" stays for the upstream project, credited in Settings → About). It is built in two flavours from the same code (`src/flavor.js`):
+
+| | Household | Public |
+|---|---|---|
+| Address | **auuki.d3-mi.com** (kept: a browser keeps rides, settings and paired-device permissions per address) | **ergatory.d3-mi.com** |
+| Access | Cloudflare Access, `household` group plus named guests | none: open to anyone |
+| Pages project | `auuki` (with `functions/`, D1 `auuki`, the HA secrets) | `ergatory`, static files only, no functions, no bindings |
+| Extras | the trainer room from Home Assistant, debug traces | neither (not in the build) |
+| Build | `npm run release` → `dist/` | `npm run release:public` → `dist-public/` |
+| Source offered | `source.tar.gz`, the whole repository | `source.tar.gz`, what builds it (src/, build config, licence) |
+
+Both offer their source at `./source.tar.gz` (Settings → About), as the AGPL's section 13 asks of a network service; `scripts/source.mjs` packages the commit being released and refuses an uncommitted `src/`. Internal identifiers that rides and settings depend on stay as they were: the intervals.icu upload's external id `auuki-<id>`, localStorage and IndexedDB keys.
+
+Deploy the public one from a folder holding only its build, so wrangler finds no `functions/` or `wrangler.toml`:
+
+```bash
+npm run release:public
+rm -rf /tmp/ergatory-public && mkdir -p /tmp/ergatory-public && cp -r dist-public /tmp/ergatory-public/site
+cd /tmp/ergatory-public && python3 ~/homeassistant/scripts/cf-pages site --name ergatory --domain ergatory.d3-mi.com --public
+```
+
+Changes on top of upstream:
 
 - **Power Match** (`src/power-match.js`): with the Power source set to the Bluetooth power meter, ERG holds the *meter's* reading on the target instead of the trainer's. It learns the meter/trainer ratio from both live streams and sends the trainer `target / ratio`. Settings → Power Match (on by default); the power meter card's Match tile shows the live offset. **It settles into long intervals**: for the first minute at a target it corrects every 3 s on a 20 s average, and by ten minutes it has eased to a 120 s average, a correction only when it is worth 2% of the target (at most every 30 s), and smaller ones (2 W+) every 90 s, so a long interval is not chased but still closes. A new target resets it. The debug panel shows `steady` and `calm`. **A new interval holds the calibration**: for 15 s after a target change of 10 W+, nothing is learned and nothing corrected (the trainer is catching up and the rider spinning up, so the two meters disagree for reasons unrelated to calibration); the new target goes out with the ratio already known, and a step up of 30 W+ ramps in over 5 s instead of landing as a wall. The debug panel and the log carry `hold`.
 - **intervals.icu, direct** (`src/models/intervals-direct.js`): upstream reaches intervals.icu through api.auuki.com, a closed backend; here the browser talks to the intervals.icu API itself with the athlete's API key (Settings → Intervals.icu, stored in that browser only). The Planned list shows the week's rides from the intervals.icu calendar as .zwo (strength sessions filtered out), FTP and weight come from intervals.icu, and the intervals.icu button on a saved activity uploads the .fit (with an `external_id`, so a repeat upload is a no-op). Off auuki.com the Auuki account backend is skipped entirely.

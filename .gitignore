@@ -2,6 +2,7 @@
 /ant-spec/
 /fit-spec/
 /dist/
+/dist-public/
 /node_modules/
 /gists/
 /src/simulation-scripts.js

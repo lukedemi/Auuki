@@ -20,6 +20,7 @@
 
 import { xf, exists } from './functions.js';
 import { uuid } from './storage/uuid.js';
+import { flags } from './flavor.js';
 
 const FLUSH_MS  = 10000;
 const MAX_BUF   = 3000;
@@ -192,7 +193,7 @@ function Trace(args = {}) {
 }
 
 const trace = Trace();
-if(typeof window !== 'undefined' && typeof document !== 'undefined' && typeof fetch === 'function' && !globalThis.__AUUKI_NO_TRACE__) {
+if(flags.traces && typeof window !== 'undefined' && typeof document !== 'undefined' && typeof fetch === 'function' && !globalThis.__AUUKI_NO_TRACE__) {
     trace.start();
     window.trace = trace;
 }
