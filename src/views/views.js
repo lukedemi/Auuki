@@ -20,6 +20,7 @@ import './ride-summary.js';
 import './ride-finished.js';
 import './pedal-settings.js';
 import './activity-history.js';
+import './device-reconnect.js';
 import './watch.js';
 import './ant-device-scan.js';
 import './keyboard.js';

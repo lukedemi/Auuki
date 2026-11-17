@@ -500,7 +500,7 @@ class SmO2Value extends DataView {
         // } else {
         //     this.style = 'color: #FE340B';
         // }
-        this.style = 'color: #56C057';
+        this.style.color = '#56C057';
         return toFixed(state, 1);
     }
 }
@@ -518,7 +518,7 @@ class THbValue extends DataView {
         xf.sub(`${this.prop}`, this.onUpdate.bind(this), this.signal);
     }
     transform(state) {
-        this.style = 'color: #FF663A';
+        this.style.color = '#FF663A';
         return toFixed(state, 2);
     }
 }
@@ -945,7 +945,7 @@ class PowerValue extends DataView {
         xf.sub(`${this.prop}`, this.onUpdate.bind(this), this.signal);
     }
     transform(state) {
-        this.style = 'color: #F8C73A';
+        this.style.color = '#F8C73A';
         return Math.round(state);
     }
 }

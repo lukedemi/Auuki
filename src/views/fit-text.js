@@ -8,6 +8,14 @@
 // largest that fits both the width and the height left under the heading.
 // Refitted when the window changes size or a value changes length.
 //
+// Fixed sizes (rider, Nov 17, 2026: "When heart rate is double digit, power
+// goes smaller. When heart rate is triple digit, power gets bigger …
+// Everything should stay a fixed size, no matter how many digits there
+// are"): a plain number is measured as at least three digits, and a value
+// only ever widens what it reserves (kJ passing 999 takes four from then on,
+// and never gives it back), so a digit coming or going moves nothing — not
+// the value, and not the row it shares a size with.
+//
 
 const DESKTOP = '(min-width: 1200px) and (min-height: 650px) and (orientation: landscape)';
 const VALUES = '.data-tiles .data-tile--value, .data-tiles .data-tile-small--value, .lap-tile--value';
@@ -16,9 +24,19 @@ const TILES = '.data-tile, .data-tile--small, .lap-tile';
 const canvas = typeof document !== 'undefined' ? document.createElement('canvas') : null;
 const ctx = canvas?.getContext?.('2d');
 
-// the text's width at 100px, digits as 0
+// the text's width at 100px, digits as 0; a plain number as at least 000
 export function templateOf(text) {
-    return String(text ?? '').trim().replace(/[0-9]/g, '0');
+    const t = String(text ?? '').trim().replace(/[0-9]/g, '0');
+    if(t === '' || t === '--' || /^0{1,2}$/.test(t)) return '000';
+    return t;
+}
+
+// the widest each value has needed, at 100px: it only grows
+const widest = new WeakMap();
+export function reserve(el, width, store = widest) {
+    const w = Math.max(width, store.get(el) ?? 0);
+    store.set(el, w);
+    return w;
 }
 
 export function fitSize({width, height, textWidth100, fill = 0.92, lineHeight = 1.0}) {
@@ -73,7 +91,7 @@ function fitAll(force = false) {
         const size = fitSize({
             width: tile.clientWidth,
             height: tile.clientHeight - (heading ? heading.offsetHeight + 6 : 0),
-            textWidth100: measure(el, templateOf(el.textContent) || '--'),
+            textWidth100: reserve(el, measure(el, templateOf(el.textContent))),
         });
         if(!size) continue;
         const r = tile.getBoundingClientRect();
