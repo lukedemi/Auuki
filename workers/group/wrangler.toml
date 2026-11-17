@@ -22,9 +22,10 @@ database_id = "2bc64c33-b33e-4a39-a47e-ef1754f39ca0"
 
 [vars]
 RTK_PRESET = "group_call_participant"
-# where guests open a ride: the same Pages project on a hostname Access
-# lets everyone reach (doc/group-ride.md § Joining)
-GUEST_ORIGIN = "https://ride.d3-mi.com"
+# where guests open a ride: the auuki-ride Pages project (the same build),
+# which Access lets everyone reach (doc/group-ride.md § Joining). To become
+# https://ride.d3-mi.com once its DNS record points at auuki-ride.pages.dev.
+GUEST_ORIGIN = "https://auuki-ride.pages.dev"
 
 [observability]
 enabled = true
