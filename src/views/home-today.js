@@ -20,6 +20,7 @@ import { xf, exists } from '../functions.js';
 import { models } from '../models/models.js';
 import { workoutStats } from './workout-detail.js';
 import direct from '../models/intervals-direct.js';
+import { core, details } from '../workout-core.js';
 
 const ZONE_VAR = {
     one: '--zone-gray', two: '--zone-blue', three: '--zone-teal', four: '--zone-green',
@@ -39,6 +40,12 @@ export const dayKey = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(
 export function clock(s) {
     const m = Math.round((s || 0) / 60);
     return m >= 90 ? `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60}` : ''}` : `${m} min`;
+}
+
+// TrainerRoad-style duration: 1:00:00
+export function hms(s) {
+    s = Math.round(s || 0);
+    return `${Math.floor(s / 3600)}:${pad(Math.floor((s % 3600) / 60))}:${pad(s % 60)}`;
 }
 
 // Monday to Sunday around `now`, each day with what is planned on it
@@ -146,16 +153,22 @@ home-today .ht--chips { display: flex; gap: 8px; flex-wrap: wrap; align-items: c
 home-today .ht--search { margin-left: auto; padding: 8px 14px; border-radius: 999px; border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.05);
     color: inherit; font: 14px system-ui, sans-serif; min-width: 220px; }
 home-today .ht--import { background: none; border: 0; color: inherit; opacity: .6; cursor: pointer; font: 13px system-ui, sans-serif; text-decoration: underline; }
-home-today .ht--grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; }
-home-today .ht--card { text-align: left; padding: 14px; border-radius: 14px; cursor: pointer; color: inherit; font: inherit;
-    background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.07); }
+home-today .ht--grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(520px, 1fr)); gap: 14px; }
+home-today .ht--card { display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 4px 18px; text-align: left; padding: 14px; border-radius: 12px; cursor: pointer;
+    color: inherit; font: inherit; background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.08); }
 home-today .ht--card:hover { background: rgba(255,255,255,.06); }
-home-today .ht--card.shown { border-color: rgba(63,208,138,.55); }
-home-today .ht--card .t { display: flex; align-items: baseline; gap: 8px; margin-top: 10px; }
-home-today .ht--card .t b { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 15px; }
-home-today .ht--card .t span { font-size: 13px; opacity: .6; white-space: nowrap; }
-home-today .ht--tag { display: inline-block; font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 6px; background: rgba(255,255,255,.08); margin-top: 5px; }
-home-today .ht--card .m { font-size: 12.5px; opacity: .6; margin-left: 6px; }
+home-today .ht--card.shown { border-color: rgba(63,208,138,.6); }
+home-today .ht--card .g { background: rgba(0,0,0,.32); border-radius: 6px; padding: 6px 4px 0; align-self: start; color: var(--foreground-color, #fff); }
+home-today .ht--card .g .ht--shape { height: 92px; display: block; }
+home-today .ht--card .name { font-size: 20px; font-weight: 800; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+home-today .ht--card .kind { font-size: 14px; opacity: .78; margin-top: 2px; }
+home-today .ht--card .kind b { font-weight: 600; opacity: 1; }
+home-today .ht--card .nums { display: flex; gap: 18px; margin-top: 10px; }
+home-today .ht--card .nums b { display: block; font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; }
+home-today .ht--card .nums span { display: block; font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; opacity: .6; }
+home-today .ht--card .det { grid-column: 1 / -1; margin-top: 8px; font-size: 13.5px; line-height: 1.45; opacity: .8;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+home-today .ht--card .det b { opacity: 1; font-weight: 700; }
 home-today .ht--empty { opacity: .6; padding: 20px 0; }
 home-today group-create { display: block; margin-top: 30px; }
 @media (min-width: 900px) {
@@ -173,10 +186,13 @@ home-today group-create { display: block; margin-top: 30px; }
     home-today .ht--search { min-width: 0; flex: 1 1 100%; margin-left: 0; }
     home-today .ht--chips { flex: 1 1 100%; flex-wrap: nowrap; overflow-x: auto; margin: 0 -16px; padding: 2px 16px; scrollbar-width: none; }
     home-today .ht--chips::-webkit-scrollbar { display: none; }
-    home-today .ht--grid { grid-template-columns: 1fr; gap: 0; }
-    home-today .ht--card { display: grid; grid-template-columns: 96px 1fr; gap: 0 12px; align-items: center; border-radius: 0; background: none; border: 0; border-top: 1px solid rgba(255,255,255,.07); padding: 12px 2px; }
-    home-today .ht--card .ht--shape { grid-row: span 2; }
-    home-today .ht--card .t { margin-top: 0; }
+    home-today .ht--grid { grid-template-columns: 1fr; gap: 10px; }
+    home-today .ht--card { grid-template-columns: 112px minmax(0, 1fr); gap: 2px 12px; padding: 12px; }
+    home-today .ht--card .g .ht--shape { height: 64px; }
+    home-today .ht--card .name { font-size: 17px; }
+    home-today .ht--card .kind { font-size: 13px; }
+    home-today .ht--card .nums { gap: 12px; margin-top: 6px; }
+    home-today .ht--card .nums b { font-size: 14.5px; }
 }
 `;
 
@@ -259,7 +275,9 @@ class HomeToday extends HTMLElement {
         const kicker = why === 'today' ? `Today · ${new Date().toLocaleDateString([], {weekday: 'long'})} · from intervals.icu`
             : source === 'planned' && when ? `Planned for ${when.toLocaleDateString([], {weekday: 'long', month: 'short', day: 'numeric'})}`
             : why === 'loaded' ? 'Loaded' : 'From the library';
-        const sub = [meta.category, clock(s.seconds), meta.author ? `by ${meta.author}` : ''].filter(Boolean).join(' · ');
+        const frac = (p) => models.ftp.toAbsolute(p, ftp) / ftp;
+        const sub = [meta.category, core(workout, frac) || clock(s.seconds)].filter(Boolean).join(' · ');
+        const about = (meta.description ?? '').trim() || details(workout, frac, ftp);
         const hasPower = s.powered > 0;
         const stat = (v, k) => `<div class="ht--stat"><b>${v}</b><span>${k}</span></div>`;
         this.$hero.innerHTML = `
@@ -275,7 +293,7 @@ class HomeToday extends HTMLElement {
                 </div>
                 <div class="ht--devices"></div>
             </div>
-            ${meta.description ? `<div class="ht--desc">${esc(meta.description)}</div>` : ''}`;
+            ${about ? `<div class="ht--desc">${esc(about)}</div>` : ''}`;
         this.renderDevices();
         // the group ride hosts the workout shown here (group-views.js)
         xf.dispatch('workout-detail:shown', workout);
@@ -338,13 +356,20 @@ class HomeToday extends HTMLElement {
         const ftp = this.ftpNow();
         const list = filtered(this.library, this.filter, (w) => this.secondsOf(w));
         const shown = this.shown;
+        const frac = (p) => models.ftp.toAbsolute(p, ftp) / ftp;
         grid.innerHTML = list.length ? list.map((w) => {
             const s = workoutStats(w, ftp);
             const on = shown && shown.source === 'library' && String(shown.workout.id) === String(w.id);
+            const main = core(w, frac);
+            const about = (w.meta?.description ?? '').trim() || details(w, frac, ftp);
             return `<button type="button" class="ht--card ${on ? 'shown' : ''}" data-id="${esc(w.id)}" data-source="library">
-                ${shape(w, ftp, 300, 52, {gap: 0.4})}
-                <div class="t"><b>${esc(w.meta?.name ?? 'Workout')}</b><span>${clock(s.seconds)}</span></div>
-                <div><span class="ht--tag">${esc(w.meta?.category ?? 'Other')}</span>${s.powered ? `<span class="m">${s.tss} TSS</span>` : ''}</div>
+                <div class="g">${shape(w, ftp, 300, 92, {gap: 0.4, line: true})}</div>
+                <div>
+                    <div class="name">${esc(w.meta?.name ?? 'Workout')}</div>
+                    <div class="kind"><b>${esc(w.meta?.category ?? 'Workout')}</b>${main ? ` · ${esc(main)}` : ''}</div>
+                    <div class="nums"><div><b>${hms(s.seconds)}</b><span>Duration</span></div>${s.powered ? `<div><b>${s.tss}</b><span>TSS</span></div><div><b>${s.IF.toFixed(2)}</b><span>IF</span></div><div><b>${s.kj}</b><span>kJ</span></div>` : ''}</div>
+                </div>
+                ${about ? `<div class="det"><b>Details:</b> ${esc(about)}</div>` : ''}
             </button>`;
         }).join('') : '<div class="ht--empty">No workouts match.</div>';
     }
