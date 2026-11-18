@@ -104,6 +104,7 @@ class Watch {
         xf.sub('ui:watchResume',  e => { self.resume();         });
         xf.sub('ui:watchLap',     e => { self.lap();            });
         xf.sub('ui:watchBack',    e => { self.back();           });
+        xf.sub('ui:watchJump',    i => { self.jump(i);          });
         // the pause screen's End workout, which asks for itself
         xf.sub('ui:watchEnd',     e => { self.stop();           });
         xf.sub('ui:watchStop',    e => {
@@ -403,6 +404,15 @@ class Watch {
             xf.dispatch('watch:lap');
             xf.dispatch('watch:lapTime', 0);
         }
+    }
+    // straight to interval i (the ramp test's cool-down, ramp-test.js)
+    jump(i) {
+        const self = this;
+        if(self.groupMode && self.isWorkoutStarted()) return;
+        if(!self.isWorkoutStarted()) return;
+        if(!(i >= 0 && i < self.intervals.length) || i === self.intervalIndex) return;
+        self.nextInterval(self.intervals, i, 0);
+        self.nextStep(self.intervals, i, 0);
     }
     step() {
         const self        = this;

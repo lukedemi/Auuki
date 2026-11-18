@@ -16,6 +16,7 @@ import './group/start.js';
 import './course.js';
 import './lock.js';
 import './start-page.js';
+import './ramp-test.js';
 
 function startServiceWorker() {
     if('serviceWorker' in navigator) {

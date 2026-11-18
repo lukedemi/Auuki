@@ -26,6 +26,7 @@ import './strava-settings.js';
 import './strava-home.js';
 import './move-in.js';
 import './home-today.js';
+import './ramp-test-view.js';
 import './household-settings.js';
 import './watch.js';
 import './ant-device-scan.js';

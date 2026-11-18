@@ -20,7 +20,7 @@ describe('the core of a workout, from its steps', () => {
         expect(core(lib['Endurance 90 min'])).toBe('1 h 30 steady at 68%');                    // the warm-up ramp is not the ride
         expect(core(lib['Recovery 45 min'])).toBe('45 min steady at 50%');
         expect(core(lib['Test · lactate steps 9×4 min'])).toBe('9 × 4 min steps, 55 → 111%');
-        expect(core(lib['Test · ramp 1 min steps'])).toBe('21 × 1 min steps, 50 → 150%');
+        expect(core(lib['Test · ramp 1 min steps'])).toBe('31 × 1 min steps, 50 → 200%');
     });
 
     test('details add the warm-up, the cool-down and the watts at an FTP', () => {
