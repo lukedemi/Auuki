@@ -1,6 +1,6 @@
 //
 // Strava, direct (this fork, Nov 17, 2026): ride uploads for family and
-// friends, through the pERGatory Strava app.
+// friends, through the infERGno Strava app.
 //
 // The rider's tokens live in this browser only (localStorage), as their
 // intervals.icu key does. Connect sends them to Strava's own approval page
@@ -11,12 +11,12 @@
 // tokens with the app's secret; the relay stores nothing. Uploads, their
 // status and later edits go through the same relay with the rider's token.
 //
-// pERGatory only uploads. It reads nothing from Strava but the connected
+// infERGno only uploads. It reads nothing from Strava but the connected
 // athlete's name.
 //
 
-const KEY = 'pergatory:strava';
-const STATE_KEY = 'pergatory:strava:state';
+const KEY = 'infergno:strava';
+const STATE_KEY = 'infergno:strava:state';
 export const SCOPE = 'read,activity:write';
 const RELAY = './api/strava';
 const POLL_MS = 2000;
@@ -48,7 +48,7 @@ export function connectedAt() {
 
 // the Connect link: Strava's own page, back to this one
 export function connectUrl(clientId, origin = location.origin, rand = () => crypto.getRandomValues(new Uint32Array(2)).join('')) {
-    const state = `pergatory-${rand()}`;
+    const state = `infergno-${rand()}`;
     try { storage()?.setItem(STATE_KEY, state); } catch(e) {}
     const q = new URLSearchParams({
         client_id: String(clientId), response_type: 'code', approval_prompt: 'auto',
@@ -63,12 +63,12 @@ export async function config(fetcher = net) {
     return r.json().catch(() => null);
 }
 
-// Back from Strava: ?state=pergatory-…&code=…&scope=… (or &error=access_denied).
+// Back from Strava: ?state=infergno-…&code=…&scope=… (or &error=access_denied).
 // Returns null when the page was not opened by Strava for us.
 export async function handleReturn(search = location.search, fetcher = net) {
     const p = new URLSearchParams(search);
     const state = p.get('state') ?? '';
-    if(!state.startsWith('pergatory-')) return null;
+    if(!state.startsWith('infergno-')) return null;
     let expected = null;
     try { expected = storage()?.getItem(STATE_KEY); storage()?.removeItem(STATE_KEY); } catch(e) {}
     if(state !== expected) return {ok: false, reason: 'this Strava answer was not for this browser; press Connect again'};
@@ -111,7 +111,7 @@ export function duplicateOf(error = '') {
 // Upload a ride's .fit and wait for Strava to turn it into an activity.
 export async function upload(blob, {name, description, externalId} = {}, {fetcher = net, wait = (ms) => new Promise((r) => setTimeout(r, ms))} = {}) {
     const form = new FormData();
-    form.append('file', blob, 'pergatory.fit');
+    form.append('file', blob, 'infergno.fit');
     form.append('data_type', 'fit');
     form.append('trainer', '1');
     if(name) form.append('name', name);

@@ -46,9 +46,9 @@ CREATE TABLE IF NOT EXISTS group_riders (
     PRIMARY KEY (ride_id, rider_id)
 );
 
--- pERGatory riders (rider, Nov 18, 2026: "keep a database of every person who
+-- infERGno riders (rider, Nov 18, 2026: "keep a database of every person who
 -- logs in with strava all their settings"), written by functions/api/rider.js.
--- One row per Strava athlete who connected on pergatory.d3-mi.com: their
+-- One row per Strava athlete who connected on infergno.com: their
 -- settings as the app keeps them in the browser, so a new browser picks them
 -- up on connecting. Deleted on Disconnect. Their Strava tokens are never here.
 CREATE TABLE IF NOT EXISTS riders (

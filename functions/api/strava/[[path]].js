@@ -1,6 +1,6 @@
 //
-// /api/strava/* — pERGatory's Strava relay (rider, Nov 17, 2026: uploads for
-// family and friends, the pERGatory Strava app, client 127032).
+// /api/strava/* — infERGno's Strava relay (rider, Nov 17, 2026: uploads for
+// family and friends, the infERGno Strava app, client 127032).
 //
 // It stores nothing. A rider's tokens live in their own browser
 // (src/models/strava-direct.js); this only does what needs the app's client

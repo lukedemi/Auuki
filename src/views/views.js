@@ -24,6 +24,7 @@ import './device-reconnect.js';
 import './about-version.js';
 import './strava-settings.js';
 import './strava-home.js';
+import './move-in.js';
 import './household-settings.js';
 import './watch.js';
 import './ant-device-scan.js';

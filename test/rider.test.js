@@ -90,14 +90,14 @@ describe('the browser end', () => {
     test('what is saved: the rider\'s settings, not this browser\'s', () => {
         expect(synced('ftp')).toBe(true);
         expect(synced('intervals-direct')).toBe(true);
-        expect(synced('pergatory:strava')).toBe(false);
+        expect(synced('infergno:strava')).toBe(false);
         expect(synced('ble:remembered')).toBe(false);
         expect(synced('planned')).toBe(false);
-        expect(snapshot(store({ftp: '1', 'pergatory:strava': 't'}))).toEqual({ftp: '1'});
+        expect(snapshot(store({ftp: '1', 'infergno:strava': 't'}))).toEqual({ftp: '1'});
     });
 
     test('a rider\'s first connect saves what this browser has', async () => {
-        const storage = store({ftp: '295', 'pergatory:strava': 'x'});
+        const storage = store({ftp: '295', 'infergno:strava': 'x'});
         const fetcher = server();
         const sync = RiderSync({storage, fetcher, token, reload: () => { throw new Error('no reload'); }, session: store()});
         expect(await sync.pull()).toBe('saved');
@@ -130,7 +130,7 @@ describe('the browser end', () => {
         const sync = RiderSync({storage, fetcher, token, session: store()});
         await sync.forget();
         expect(fetcher.rec()).toBe(null);
-        expect(storage.getItem('pergatory:sync')).toBe(null);
+        expect(storage.getItem('infergno:sync')).toBe(null);
     });
 });
 

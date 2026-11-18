@@ -612,7 +612,7 @@ class Activity extends Model {
     async createFromCurrent(db) {
         const id = uuid();
         const blob = fileHandler.toBlob(this.encode(db));
-        const name = db.workout?.meta?.name ?? 'pERGatory ride';
+        const name = db.workout?.meta?.name ?? 'infERGno ride';
 
         const summary = {
             id,

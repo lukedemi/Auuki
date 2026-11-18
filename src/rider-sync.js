@@ -1,5 +1,5 @@
 //
-// A pERGatory rider's settings, saved under their Strava account (rider,
+// A infERGno rider's settings, saved under their Strava account (rider,
 // Nov 18, 2026: "keep a database of every person who logs in with strava all
 // their settings, etc - essentially that's their username"). The server end
 // is functions/api/rider.js.
@@ -17,7 +17,7 @@
 //
 // The whole set is one record; the last browser to save wins. What is saved:
 // every localStorage setting except what belongs to this browser or is
-// fetched anyway: the app's own keys (pergatory:*, the Strava tokens among
+// fetched anyway: the app's own keys (infergno:*, the Strava tokens among
 // them), Bluetooth pairings, the cached planned workouts.
 //
 import { xf } from './functions.js';
@@ -25,10 +25,10 @@ import { flags } from './flavor.js';
 import strava from './models/strava-direct.js';
 
 const URL_ = './api/rider';
-const SYNC = 'pergatory:sync';
-const RELOADED = 'pergatory:sync:reloaded';
+const SYNC = 'infergno:sync';
+const RELOADED = 'infergno:sync:reloaded';
 const PUSH_MS = 60 * 1000;
-export const NOT_SYNCED = [/^pergatory:/, /^ergatory:/, /^ble:/, /^planned$/];
+export const NOT_SYNCED = [/^infergno:/, /^pergatory:/, /^ergatory:/, /^ble:/, /^planned$/];
 export const synced = (key) => !NOT_SYNCED.some((re) => re.test(key));
 const net = (...a) => globalThis.fetch(...a);
 
