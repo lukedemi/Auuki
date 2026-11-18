@@ -2,7 +2,8 @@
  * @jest-environment jsdom
  */
 
-import { collect, apply, carried } from '../src/transfer.js';
+import { collect, apply, carried, renamed } from '../src/transfer.js';
+import { redirectFor } from '../functions/_middleware.js';
 import { onRequestGet as me } from '../functions/api/me.js';
 
 global.Response = global.Response ?? class { constructor(body, init = {}) { this._b = body; this.status = init.status ?? 200; this.ok = this.status < 400; } async json() { return JSON.parse(this._b); } };
@@ -21,7 +22,7 @@ describe('the household, on the public site', () => {
         const yes = async () => ({ok: true, headers: {get: () => 'application/json'}, json: async () => ({household: true, email: 'luke@x'})});
         const loginRedirect = async () => ({ok: false, status: 0, type: 'opaqueredirect', headers: {get: () => null}, json: async () => ({})});
         const meta = document.createElement('meta');
-        meta.name = 'ergatory-flavor'; meta.content = 'public';
+        meta.name = 'pergatory-flavor'; meta.content = 'public';
         document.head.appendChild(meta);
         let hh;
         jest.isolateModules(() => { hh = require('../src/household.js'); });
@@ -30,11 +31,11 @@ describe('the household, on the public site', () => {
         await check(yes);
         expect(isHousehold()).toBe(true);
         expect(householdEmail()).toBe('luke@x');
-        expect(JSON.parse(localStorage.getItem('ergatory:household')).household).toBe(true);
+        expect(JSON.parse(localStorage.getItem('pergatory:household')).household).toBe(true);
         expect(document.documentElement.dataset.household).toBe('1');
         await check(loginRedirect);
         expect(isHousehold()).toBe(false);
-        expect(localStorage.getItem('ergatory:household')).toBe(null);
+        expect(localStorage.getItem('pergatory:household')).toBe(null);
         expect(document.documentElement.dataset.household).toBeUndefined();
         await check(async () => { throw new Error('offline'); });           // offline keeps what it knew
         expect(isHousehold()).toBe(false);
@@ -65,24 +66,44 @@ describe('moving from auuki.d3-mi.com', () => {
         expect(carried('ftp')).toBe(true);
         expect(carried('intervals-direct')).toBe(true);
         expect(carried('sources')).toBe(true);
-        expect(carried('ergatory:strava')).toBe(false);
+        expect(carried('pergatory:strava')).toBe(true);           // the rider's tokens, not the address's
+        expect(carried('ergatory:strava')).toBe(true);
+        expect(renamed('ergatory:strava')).toBe('pergatory:strava');
+        expect(carried('ergatory:strava:state')).toBe(false);
+        expect(carried('pergatory:household')).toBe(false);
         expect(carried('ergatory:household')).toBe(false);
+        expect(carried('ergatory:transfer')).toBe(false);
         expect(carried('ble:remembered')).toBe(false);
     });
 
     test('collected there, applied here: settings overwrite, rides and workouts add', async () => {
-        const there = store({ftp: '295', 'intervals-direct': '{"key":"k"}', 'ble:remembered': '{}', 'ergatory:strava': 'theirs'});
+        const there = store({ftp: '295', 'intervals-direct': '{"key":"k"}', 'ble:remembered': '{}', 'ergatory:household': '{}', 'ergatory:strava': 'tokens'});
         const thereIdb = fakeIdb({activity: [{id: 'a1'}, {id: 'a2'}], workouts: [{id: 'w1'}]});
         const data = await collect({storage: there, idb: thereIdb});
-        expect(Object.keys(data.settings).sort()).toEqual(['ftp', 'intervals-direct']);
+        expect(Object.keys(data.settings).sort()).toEqual(['ergatory:strava', 'ftp', 'intervals-direct']);
 
-        const here = store({ftp: '250', 'ergatory:strava': 'mine'});
+        const here = store({ftp: '250', 'pergatory:household': 'mine'});
         const hereIdb = fakeIdb({activity: [{id: 'a2', mine: true}]});
         const res = await apply(data, {storage: here, idb: hereIdb});
-        expect(res).toEqual({settings: 2, rides: 1, workouts: 1});
+        expect(res).toEqual({settings: 3, rides: 1, workouts: 1});
         expect(here.getItem('ftp')).toBe('295');
-        expect(here.getItem('ergatory:strava')).toBe('mine');
+        expect(here.getItem('pergatory:strava')).toBe('tokens');   // Strava comes along, under its new name
+        expect(here.getItem('pergatory:household')).toBe('mine');
         expect(hereIdb._s.activity.find((r) => r.id === 'a2').mine).toBe(true);    // what this site had stays
         expect(hereIdb._s.activity.map((r) => r.id).sort()).toEqual(['a1', 'a2']);
+    });
+});
+
+describe('ergatory.d3-mi.com, after the move', () => {
+    test('its pages go to pergatory; the transfer page, scripts and API stay', () => {
+        expect(redirectFor('https://ergatory.d3-mi.com/')).toBe('https://pergatory.d3-mi.com/');
+        expect(redirectFor('https://ergatory.d3-mi.com/?state=x&code=y')).toBe('https://pergatory.d3-mi.com/?state=x&code=y');
+        expect(redirectFor('https://ergatory.d3-mi.com/privacy.html')).toBe('https://pergatory.d3-mi.com/privacy.html');
+        expect(redirectFor('https://ergatory.d3-mi.com/household')).toBe('https://pergatory.d3-mi.com/household');
+        expect(redirectFor('https://ergatory.d3-mi.com/transfer.html')).toBe(null);
+        expect(redirectFor('https://ergatory.d3-mi.com/transfer.1234.js')).toBe(null);
+        expect(redirectFor('https://ergatory.d3-mi.com/api/strava/config')).toBe(null);
+        expect(redirectFor('https://pergatory.d3-mi.com/')).toBe(null);
+        expect(redirectFor('https://auuki.d3-mi.com/')).toBe(null);
     });
 });

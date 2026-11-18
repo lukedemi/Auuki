@@ -5,10 +5,10 @@
 // Not connected: Strava's own "Connect with Strava" button, linking straight
 // to strava.com/oauth/authorize as its brand guidelines require. Connected:
 // who, and Disconnect (revoked at Strava, forgotten here). The "Compatible
-// with Strava" mark sits beside it, smaller than ERGatory's own name, never
+// with Strava" mark sits beside it, smaller than pERGatory's own name, never
 // as an icon.
 //
-// The return from Strava (?state=ergatory-…&code=…) is handled here on load:
+// The return from Strava (?state=pergatory-…&code=…) is handled here on load:
 // the code is swapped for tokens, the address cleaned, and Settings opened
 // on this card with the outcome.
 //
@@ -45,7 +45,7 @@ class StravaSettings extends HTMLElement {
         this.msg = null;
         this.clientId = null;
         if(!flags.strava) {
-            this.innerHTML = `<p class="sv--note">Strava connects on the public ERGatory, <a class="a" href="${PUBLIC_URL}/">ergatory.d3-mi.com</a>, where its Strava app sends riders back. This household copy doesn't upload to Strava; your own rides reach it through bikes.</p>`;
+            this.innerHTML = `<p class="sv--note">Strava connects on the public pERGatory, <a class="a" href="${PUBLIC_URL}/">pergatory.d3-mi.com</a>, where its Strava app sends riders back. This household copy doesn't upload to Strava; your own rides reach it through bikes.</p>`;
             return;
         }
         this.render();
@@ -81,17 +81,17 @@ class StravaSettings extends HTMLElement {
                     <button type="button" data-act="disconnect">Disconnect</button>
                     ${mark}
                 </div>
-                <p class="sv--note">Each ride you finish is uploaded to your Strava, with its name and notes; edits you make afterwards follow it there. ERGatory only uploads: it reads nothing from your Strava but your name.</p>
+                <p class="sv--note">Each ride you finish is uploaded to your Strava, with its name and notes; edits you make afterwards follow it there. pERGatory only uploads: it reads nothing from your Strava but your name.</p>
                 ${msg}`;
             this.querySelector('[data-act="disconnect"]').addEventListener('click', async () => {
                 await strava.disconnect();
-                this.msg = ['ok', 'Disconnected. ERGatory no longer has access to your Strava.'];
+                this.msg = ['ok', 'Disconnected. pERGatory no longer has access to your Strava.'];
                 this.render();
             });
             return;
         }
         if(!this.clientId) {
-            this.innerHTML = `<p class="sv--note">Strava isn't set up on this copy of ERGatory.</p>${msg}`;
+            this.innerHTML = `<p class="sv--note">Strava isn't set up on this copy of pERGatory.</p>${msg}`;
             return;
         }
         this.innerHTML = `
@@ -99,7 +99,7 @@ class StravaSettings extends HTMLElement {
                 <a class="sv--connect" href="${esc(strava.connectUrl(this.clientId))}"><img src="${connectButton}" alt="Connect with Strava"></a>
                 ${mark}
             </div>
-            <p class="sv--note">Connect to have each ride you finish uploaded to your Strava, with its name and notes. Strava asks you to allow ERGatory to upload activities; it reads nothing else. Disconnect here any time.</p>
+            <p class="sv--note">Connect to have each ride you finish uploaded to your Strava, with its name and notes. Strava asks you to allow pERGatory to upload activities; it reads nothing else. Disconnect here any time.</p>
             ${msg}`;
         // a fresh state each time the link is used
         this.querySelector('.sv--connect').addEventListener('click', (e) => { e.currentTarget.href = strava.connectUrl(this.clientId); });

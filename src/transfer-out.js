@@ -1,7 +1,7 @@
 //
-// auuki.d3-mi.com/transfer.html: hands this site's settings, rides and
-// workouts to ergatory.d3-mi.com when it asks from a frame (transfer.js).
-// Answers ergatory only, and only to a request.
+// /transfer.html on auuki.d3-mi.com and ergatory.d3-mi.com: hands that
+// address's settings, rides and workouts to pergatory.d3-mi.com when it asks
+// from a frame (transfer.js). Answers pergatory only, and only to a request.
 //
 import { idb } from './storage/idb.js';
 import { collect, TO, REQUEST } from './transfer.js';
@@ -13,8 +13,8 @@ window.addEventListener('message', async (e) => {
         const data = await collect({storage: localStorage, idb});
         e.source.postMessage(data, TO);
     } catch(err) {
-        e.source.postMessage({type: 'ergatory-transfer-error', error: String(err?.message ?? err)}, TO);
+        e.source.postMessage({type: 'pergatory-transfer-error', error: String(err?.message ?? err)}, TO);
     }
 });
-// ready: ergatory waits for this before asking
-if(window.parent !== window) window.parent.postMessage({type: 'ergatory-transfer-ready'}, TO);
+// ready: pergatory waits for this before asking
+if(window.parent !== window) window.parent.postMessage({type: 'pergatory-transfer-ready'}, TO);

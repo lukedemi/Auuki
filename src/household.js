@@ -5,7 +5,7 @@
 //
 // The household build (auuki.d3-mi.com, all of it behind Cloudflare Access)
 // always is. The public build asks /api/me, one of the few paths on
-// ergatory.d3-mi.com that Cloudflare Access keeps for the household group
+// pergatory.d3-mi.com that Cloudflare Access keeps for the household group
 // (with /api/room, /api/trace, /api/host and /household). Signed in there —
 // Settings > Household sign-in, which goes through /household once and lasts
 // a month — it answers with the email; for anyone else Access answers with a
@@ -19,7 +19,7 @@
 import { xf } from './functions.js';
 import { FLAVOR } from './flavor.js';
 
-const KEY = 'ergatory:household';
+const KEY = 'pergatory:household';
 
 function storage() { try { return globalThis.localStorage; } catch(e) { return undefined; } }
 
