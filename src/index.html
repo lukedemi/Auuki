@@ -422,26 +422,14 @@
 
             <div id="workouts-page" class="page active" page="workouts">
                 <div class="library--switch--group">
+                    <!-- the app's header on the Home page (rider, Nov 18, 2026: design A) -->
+                    <div class="hdr--brand">inf<b>ERG</b>no</div>
                     <navigation-action
                         id="link--workouts-workouts"
                         class="library--switch--heading active"
                         action="workouts:workouts"
                         topic=":nav"
-                    >Workouts
-                    </navigation-action>
-                    <navigation-action
-                        id="link--workouts-editor"
-                        class="library--switch--heading"
-                        action="workouts:editor"
-                        topic=":nav"
-                    >Editor
-                    </navigation-action>
-                    <navigation-action
-                        id="link--workouts-report"
-                        class="library--switch--heading"
-                        action="workouts:report"
-                        topic=":nav"
-                    >Ride report
+                    >Home
                     </navigation-action>
                     <navigation-action
                         id="link--workouts-activities"
@@ -450,6 +438,24 @@
                         topic=":nav"
                     >Activities
                     </navigation-action>
+                    <navigation-action
+                        id="link--workouts-editor"
+                        class="library--switch--heading"
+                        action="workouts:editor"
+                        topic=":nav"
+                    >Builder
+                    </navigation-action>
+                    <navigation-action
+                        id="link--workouts-report"
+                        class="library--switch--heading"
+                        action="workouts:report"
+                        topic=":nav"
+                    >Ride report
+                    </navigation-action>
+                    <div class="hdr--right">
+                        <page-btn class="hdr--link" prop="page" effect="page-set" param="home">Ride screen</page-btn>
+                        <page-btn class="hdr--link" prop="page" effect="page-set" param="settings">Settings</page-btn>
+                    </div>
                 </div>
                 <workout-editor id="view--workouts-editor" class="sub-tab">
                     <div class="editor-cont">
@@ -592,18 +598,22 @@
 
                 <!-- workout-list -->
                 <div id="view--workouts-workouts" class="workout-list sub-tab active">
-                    <!-- desktop: the workout you picked, large, beside the lists
-                         (views/workout-detail.js); on a phone only the group
-                         ride box shows, above the lists, as before -->
-                    <!-- the rider's Strava: Connect, or who is connected (strava-home.js);
-                         first on a phone, atop the lists on a desktop -->
-                    <div class="wk--top">
+                    <!-- Home, design A (views/home-today.js): today's workout large with
+                         Ride, the week beside it, the library below. The move card, the
+                         rider's Strava and the group ride box live inside it. -->
+                    <home-today>
                         <move-in></move-in>
-                        <strava-home></strava-home>
-                    </div>
+                        <div class="ht--top">
+                            <section class="ht--hero"></section>
+                            <aside class="ht--side"><div class="ht--week"></div><strava-home></strava-home></aside>
+                        </div>
+                        <section class="ht--lib"></section>
+                        <group-create></group-create>
+                    </home-today>
+                    <!-- the upstream lists and detail pane, kept for what they still carry
+                         (the planned refresh, the file import), never shown -->
                     <div class="wk--pane">
                         <workout-detail></workout-detail>
-                        <group-create></group-create>
                     </div>
                     <div class="wk--lists">
                     <div class="list--sub-section">
