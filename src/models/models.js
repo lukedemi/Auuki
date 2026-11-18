@@ -9,7 +9,7 @@ import { idb } from '../storage/idb.js';
 import { uuid } from '../storage/uuid.js';
 
 import API from './api.js';
-import { workouts as workoutsFile }  from '../workouts/workouts.js';
+import { workouts as workoutsFile, DEFAULT_WORKOUT }  from '../workouts/workouts.js';
 import { zwo } from '../workouts/zwo.js';
 import { fileHandler } from '../file.js';
 import { Model as Cycling } from '../physics.js';
@@ -820,12 +820,14 @@ class Workout extends Model {
         self.api = args.api;
     }
     // state init
-    defaultValue() { return this.parse((first(workoutsFile))); }
+    // the library's default (workouts.js), else its first
+    defaultValue() { return this.parse(workoutsFile.find((w) => w.includes(`<name>${DEFAULT_WORKOUT}</name>`)) ?? first(workoutsFile)); }
     defaultIsValid(value) {
         return exists(value);
     }
+    // on load: the library's default (workouts.js), else the first
     restore(db) {
-        return first(db.workouts);
+        return (db.workouts ?? []).find((w) => w.meta?.name === DEFAULT_WORKOUT) ?? first(db.workouts);
     }
     // accessors
     find(workouts, id) {
