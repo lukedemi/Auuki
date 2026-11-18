@@ -21,7 +21,7 @@ export function lastTransfer(name = 'auuki') {
 export function pull(from, {waitMs = WAIT_MS} = {}) {
     return new Promise((resolve, reject) => {
         const frame = document.createElement('iframe');
-        frame.src = `${from}/transfer.html`;
+        frame.src = `${from}/transfer`;   // Pages' own address for transfer.html
         frame.style.display = 'none';
         frame.setAttribute('aria-hidden', 'true');
         const timer = setTimeout(() => finish(new Error(`${from} did not answer: open it once in this browser, signed in, then try again`)), waitMs);

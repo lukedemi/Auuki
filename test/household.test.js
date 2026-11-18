@@ -101,6 +101,7 @@ describe('ergatory.d3-mi.com, after the move', () => {
         expect(redirectFor('https://ergatory.d3-mi.com/privacy.html')).toBe('https://pergatory.d3-mi.com/privacy.html');
         expect(redirectFor('https://ergatory.d3-mi.com/household')).toBe('https://pergatory.d3-mi.com/household');
         expect(redirectFor('https://ergatory.d3-mi.com/transfer.html')).toBe(null);
+        expect(redirectFor('https://ergatory.d3-mi.com/transfer')).toBe(null);    // where Pages sends transfer.html
         expect(redirectFor('https://ergatory.d3-mi.com/transfer.1234.js')).toBe(null);
         expect(redirectFor('https://ergatory.d3-mi.com/api/strava/config')).toBe(null);
         expect(redirectFor('https://pergatory.d3-mi.com/')).toBe(null);
