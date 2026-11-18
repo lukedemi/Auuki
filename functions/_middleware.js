@@ -15,7 +15,8 @@ export const OLD_HOSTS = ['ergatory.d3-mi.com'];
 
 // a page, as opposed to a script, an image, the API or the transfer page
 export function isPage(path) {
-    if(path === '/transfer.html' || path.startsWith('/api/') || path.startsWith('/cdn-cgi/')) return false;
+    // Pages serves /transfer.html as /transfer (it drops .html with a 308)
+    if(path === '/transfer.html' || path === '/transfer' || path.startsWith('/api/') || path.startsWith('/cdn-cgi/')) return false;
     const last = path.split('/').pop();
     return last === '' || last.endsWith('.html') || !last.includes('.');
 }
