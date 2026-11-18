@@ -42,6 +42,16 @@ export function clock(s) {
     return m >= 90 ? `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60}` : ''}` : `${m} min`;
 }
 
+// a card's details: the library's own workouts (workouts.js) carry their
+// purpose only, so their structure with the watts goes first; anyone else's
+// description is theirs, and the structure stands in only without one
+export function aboutOf(w, frac, ftp) {
+    const desc = (w?.meta?.description ?? '').trim();
+    const shape = details(w, frac, ftp);
+    if(w?.meta?.author === 'infERGno') return [shape, desc].filter(Boolean).join(' ');
+    return desc || shape;
+}
+
 // TrainerRoad-style duration: 1:00:00
 export function hms(s) {
     s = Math.round(s || 0);
@@ -277,7 +287,7 @@ class HomeToday extends HTMLElement {
             : why === 'loaded' ? 'Loaded' : 'From the library';
         const frac = (p) => models.ftp.toAbsolute(p, ftp) / ftp;
         const sub = [meta.category, core(workout, frac) || clock(s.seconds)].filter(Boolean).join(' · ');
-        const about = (meta.description ?? '').trim() || details(workout, frac, ftp);
+        const about = aboutOf(workout, frac, ftp);
         const hasPower = s.powered > 0;
         const stat = (v, k) => `<div class="ht--stat"><b>${v}</b><span>${k}</span></div>`;
         this.$hero.innerHTML = `
@@ -361,7 +371,7 @@ class HomeToday extends HTMLElement {
             const s = workoutStats(w, ftp);
             const on = shown && shown.source === 'library' && String(shown.workout.id) === String(w.id);
             const main = core(w, frac);
-            const about = (w.meta?.description ?? '').trim() || details(w, frac, ftp);
+            const about = aboutOf(w, frac, ftp);
             return `<button type="button" class="ht--card ${on ? 'shown' : ''}" data-id="${esc(w.id)}" data-source="library">
                 <div class="g">${shape(w, ftp, 300, 92, {gap: 0.4, line: true})}</div>
                 <div>
