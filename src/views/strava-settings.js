@@ -16,6 +16,7 @@
 import { xf } from '../functions.js';
 import strava from '../models/strava-direct.js';
 import { flags, PUBLIC_URL } from '../flavor.js';
+import riderSync from '../rider-sync.js';
 import connectButton from 'url:../images/connections/strava/btn_strava_connect_with_orange.svg';
 import compatible from 'url:../images/connections/strava/api_logo_cptblWith_strava_horiz_white.svg';
 
@@ -55,10 +56,12 @@ class StravaSettings extends HTMLElement {
             if(res) {
                 history.replaceState({}, document.title, location.pathname);
                 this.msg = res.ok
-                    ? ['ok', `Connected${res.athlete?.firstname ? ` as ${res.athlete.firstname} ${res.athlete.lastname ?? ''}` : ''}. Rides you finish from now on go to your Strava.`]
+                    ? ['ok', `Connected${res.athlete?.firstname ? ` as ${res.athlete.firstname} ${res.athlete.lastname ?? ''}` : ''}. Rides you finish from now on go to your Strava, and your settings are saved to your account.`]
                     : ['bad', `Not connected: ${res.reason}.`];
-                xf.dispatch('ui:page-set', 'settings');
-                setTimeout(() => this.scrollIntoView({block: 'center'}), 300);
+                // back on Home, where the Connect button usually is (strava-home.js)
+                xf.dispatch('strava:return', res);
+                if(res.ok) xf.dispatch('strava:connected', res);
+                xf.dispatch('ui:page-set', 'workouts');
             }
         } catch(e) {
             this.msg = ['bad', `Not connected: ${e.message}.`];
@@ -81,11 +84,14 @@ class StravaSettings extends HTMLElement {
                     <button type="button" data-act="disconnect">Disconnect</button>
                     ${mark}
                 </div>
-                <p class="sv--note">Each ride you finish is uploaded to your Strava, with its name and notes; edits you make afterwards follow it there. pERGatory only uploads: it reads nothing from your Strava but your name.</p>
+                <p class="sv--note">Each ride you finish is uploaded to your Strava, with its name and notes; edits you make afterwards follow it there. Your settings are saved to your account here, so another browser picks them up when you connect it. pERGatory only uploads: it reads nothing from your Strava but your name. Disconnect deletes the saved settings.</p>
                 ${msg}`;
             this.querySelector('[data-act="disconnect"]').addEventListener('click', async () => {
+                // the saved settings first: deleting them needs the Strava token
+                await riderSync.forget();
                 await strava.disconnect();
-                this.msg = ['ok', 'Disconnected. pERGatory no longer has access to your Strava.'];
+                xf.dispatch('strava:disconnected');
+                this.msg = ['ok', 'Disconnected. pERGatory no longer has access to your Strava, and your saved settings are deleted (this browser keeps its own).'];
                 this.render();
             });
             return;
@@ -99,7 +105,7 @@ class StravaSettings extends HTMLElement {
                 <a class="sv--connect" href="${esc(strava.connectUrl(this.clientId))}"><img src="${connectButton}" alt="Connect with Strava"></a>
                 ${mark}
             </div>
-            <p class="sv--note">Connect to have each ride you finish uploaded to your Strava, with its name and notes. Strava asks you to allow pERGatory to upload activities; it reads nothing else. Disconnect here any time.</p>
+            <p class="sv--note">Connect to have each ride you finish uploaded to your Strava, with its name and notes, and your settings saved to your account, so another browser picks them up when you connect it. Strava asks you to allow pERGatory to upload activities; it reads nothing else. Disconnect here any time.</p>
             ${msg}`;
         // a fresh state each time the link is used
         this.querySelector('.sv--connect').addEventListener('click', (e) => { e.currentTarget.href = strava.connectUrl(this.clientId); });

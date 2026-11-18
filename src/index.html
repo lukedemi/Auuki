@@ -35,7 +35,7 @@
             <navigation-stack>
             <page-group prop="page">
                 <compatibility-check></compatibility-check>
-                <div id="home-page" class="page active" page="home">
+                <div id="home-page" class="page" page="home">
                     <div id="home-page-wrapper">
 
                         <header class="connections-header page-header">
@@ -420,7 +420,7 @@
                 </div> <!-- end home-page-wrapper -->
             </div> <!-- end page-home -->
 
-            <div id="workouts-page" class="page" page="workouts">
+            <div id="workouts-page" class="page active" page="workouts">
                 <div class="library--switch--group">
                     <navigation-action
                         id="link--workouts-workouts"
@@ -595,6 +595,9 @@
                     <!-- desktop: the workout you picked, large, beside the lists
                          (views/workout-detail.js); on a phone only the group
                          ride box shows, above the lists, as before -->
+                    <!-- the rider's Strava: Connect, or who is connected (strava-home.js);
+                         first on a phone, atop the lists on a desktop -->
+                    <strava-home></strava-home>
                     <div class="wk--pane">
                         <workout-detail></workout-detail>
                         <group-create></group-create>
@@ -605,6 +608,8 @@
                             <div class="list--row--inner list--heading--cont control">
                                 <h2 class="list--sub-heading">Planned</h2>
                                 <div class="planned--actions">
+                                    <!-- shown until intervals.icu is connected (planned-list.js) -->
+                                    <a class="planned--connect" href="#" hidden><svg class="planned--connect--icon"><use href="#icon--intervals" /></svg><span>Connect intervals.icu to show planned workouts</span></a>
                                     <view-action
                                         class="activity--action"
                                         action=":intervals:wod"
@@ -1644,7 +1649,7 @@
                         <h2 class="page--heading">About pERGatory</h2>
                         <div class="about--text">
                             <p class="">pERGatory is an indoor trainer app for structured workouts in ERG mode. It is based on <a class="a" href="https://github.com/dvmarinoff/Auuki">Auuki</a> by Dimitar Marinov, and has been changed from it since November 2026 (Power Match, the end screen and ride image, intervals.icu uploads, Activities, and more).</p>
-                            <p class="public-only">Your rides, settings and paired devices stay in this browser. Nothing you record is sent anywhere except to intervals.icu and Strava, and only if you connect them yourself in Settings.</p>
+                            <p class="public-only">Your rides and paired devices stay in this browser. Nothing you record is sent anywhere except to intervals.icu and Strava, and only if you connect them yourself. Connecting Strava also saves your settings to your Strava account here, so another browser picks them up; Disconnect deletes them.</p>
                             <p class="home-only">This is the household copy. Rides, settings and paired devices stay in this browser; it also sends debug traces to its own server and reads the trainer room from Home Assistant.</p>
                         </div>
                         <div class="about--version">
@@ -1724,25 +1729,30 @@
                             </svg>
                             <div class="menu--btn--label">Settings</div>
                         </page-btn>
-                        <page-btn id="home-tab-btn"
+                        <!-- Home is the workout selector (page "workouts"); Ride is the live
+                             screen (page "home") — rider, Nov 18, 2026: "when you start you
+                             shouldn't start on the live workout, you should load into the
+                             workout selector screen and that's now what we call the home page".
+                             The page ids stay as upstream named them. -->
+                        <page-btn id="workouts-tab-btn"
                                   class="menu--btn active"
                                   prop="page"
                                   effect="page-set"
-                                  param="home">
+                                  param="workouts">
                             <svg class="menu--btn--icon" width="24" height="24">
                                 <use href="#icon--home"></use>
                             </svg>
                             <div class="menu--btn--label">Home</div>
                         </page-btn>
-                        <page-btn id="workouts-tab-btn"
+                        <page-btn id="home-tab-btn"
                                   class="menu--btn"
                                   prop="page"
                                   effect="page-set"
-                                  param="workouts">
+                                  param="home">
                             <svg class="menu--btn--icon" width="24" height="24">
-                                <use href="#icon--list"></use>
+                                <use href="#icon--play-btn"></use>
                             </svg>
-                            <div class="menu--btn--label">Workouts</div>
+                            <div class="menu--btn--label">Ride</div>
                         </page-btn>
                     </div> <!-- end page-btn-group -->
                 </div> <!-- end menu -->

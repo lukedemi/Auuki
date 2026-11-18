@@ -2,6 +2,7 @@ import { xf, empty, } from '../functions.js';
 import { isoDate, isoDateToWeekDay } from '../utils.js';
 import { models } from '../models/models.js';
 import { WorkoutGraphViewModel, } from './workout-graph-svg.js';
+import direct from '../models/intervals-direct.js';
 
 
 // TODO:
@@ -30,6 +31,18 @@ class PlannedList extends HTMLElement {
             `.planned--actions .connection-icon-switch--indicator.tp`
         );
 
+        // Not connected: the heading's intervals.icu button says what it is for
+        // (rider, Nov 18, 2026) and opens Settings > intervals.icu
+        this.$connect = document.querySelector('.planned--actions .planned--connect');
+        this.$refresh = document.querySelector('.planned--actions view-action');
+        this.$connect?.addEventListener('click', (e) => {
+            e.preventDefault();
+            xf.dispatch('ui:page-set', 'settings');
+            setTimeout(() => document.querySelector('intervals-direct-settings')?.scrollIntoView({block: 'center', behavior: 'smooth'}), 150);
+        }, this.signal);
+        xf.sub('services', () => this.showConnect(), this.signal);
+        this.showConnect();
+
         xf.sub(`db:ftp`,      this.onFTP.bind(this), this.signal);
         xf.sub('action:planned', self.onAction.bind(this), this.signal);
 
@@ -41,6 +54,11 @@ class PlannedList extends HTMLElement {
     }
     disconnectedCallback() {
         this.abortController.abort();
+    }
+    showConnect() {
+        const on = direct.isConfigured();
+        if(this.$connect) this.$connect.hidden = on;
+        if(this.$refresh) this.$refresh.hidden = !on;
     }
     onAction(action) {
         // TODO: handle this directly in db
