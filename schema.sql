@@ -67,3 +67,38 @@ CREATE TABLE IF NOT EXISTS rider_tokens (
     name        TEXT,
     expires_at  INTEGER NOT NULL      -- ms
 );
+
+-- What people do on infERGno (rider, Nov 18, 2026: "I want logging built into
+-- the whole site so I can see everything anybody is doing"). Written by
+-- functions/api/log.js: the app's own events (src/log.js), and the server's
+-- for what it can vouch for (a Strava connect, a first settings save, a
+-- group ride). Read at /admin (functions/api/admin/[[path]].js). Kept 180 days.
+CREATE TABLE IF NOT EXISTS events (
+    id       INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts       INTEGER NOT NULL,     -- ms
+    visitor  TEXT,                 -- the browser's anonymous id (localStorage)
+    session  TEXT,                 -- one page load
+    who      TEXT,                 -- the Strava rider or household login, when known
+    source   TEXT NOT NULL,        -- app (the browser says) · server (the server saw)
+    kind     TEXT NOT NULL,        -- load, page, ride:start, group:create, error, …
+    data     TEXT,                 -- JSON
+    path     TEXT,
+    host     TEXT,                 -- which site
+    country  TEXT,
+    city     TEXT,
+    ua       TEXT
+);
+CREATE INDEX IF NOT EXISTS events_ts ON events(ts);
+CREATE INDEX IF NOT EXISTS events_visitor_ts ON events(visitor, ts);
+CREATE INDEX IF NOT EXISTS events_kind_ts ON events(kind, ts);
+CREATE TABLE IF NOT EXISTS visitors (
+    visitor     TEXT PRIMARY KEY,
+    who         TEXT,              -- the last name it was known by
+    first_seen  INTEGER NOT NULL,
+    last_seen   INTEGER NOT NULL,
+    events      INTEGER NOT NULL DEFAULT 0,
+    country     TEXT,
+    city        TEXT,
+    ua          TEXT
+);
+CREATE INDEX IF NOT EXISTS visitors_last ON visitors(last_seen);

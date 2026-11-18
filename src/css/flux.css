@@ -4175,8 +4175,7 @@ and (orientation: landscape) {
 
 /* the public build (flavor.js): what only the household copy has */
 html[data-flavor="public"]:not([data-household]) .home-only,
-html[data-flavor="public"]:not([data-household]) room-status,
-html[data-flavor="public"]:not([data-household]) group-create { display: none !important; }
+html[data-flavor="public"]:not([data-household]) room-status { display: none !important; }
 html:not([data-flavor="public"]) .public-only,
 html[data-household] .public-only { display: none !important; }
 

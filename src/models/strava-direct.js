@@ -23,6 +23,8 @@ const POLL_MS = 2000;
 const POLL_TRIES = 45;      // Strava usually processes a .fit in seconds; give it 90
 // fetch looked up when used, not when a function is defined or called without one
 const net = (...a) => globalThis.fetch(...a);
+// the browser's log id (log.js), so the server's own log lines up with the app's
+const visitorHeader = () => { try { return {'x-infergno-visitor': localStorage.getItem('infergno:visitor') ?? ''}; } catch(e) { return {}; } };
 
 function storage() {
     try { return globalThis.localStorage; } catch(e) { return undefined; }
@@ -75,7 +77,7 @@ export async function handleReturn(search = location.search, fetcher = net) {
     if(p.get('error')) return {ok: false, reason: p.get('error') === 'access_denied' ? 'you declined on Strava' : p.get('error')};
     const scope = p.get('scope') ?? '';
     if(!/activity:write/.test(scope)) return {ok: false, reason: 'Strava did not grant upload permission; tick "Upload your activities" when you connect'};
-    const r = await fetcher(`${RELAY}/token`, {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({code: p.get('code')})});
+    const r = await fetcher(`${RELAY}/token`, {method: 'POST', headers: {'content-type': 'application/json', ...visitorHeader()}, body: JSON.stringify({code: p.get('code')})});
     const body = await r.json().catch(() => ({}));
     if(!r.ok || !body.refresh_token) return {ok: false, reason: body.error ?? `the relay answered ${r.status}`};
     save({...body, scope, connected_at: Date.now()});

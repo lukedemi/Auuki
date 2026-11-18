@@ -18,6 +18,8 @@
 // Nothing else is forwarded. Secrets: STRAVA_CLIENT_ID, STRAVA_CLIENT_SECRET.
 //
 
+import { record } from '../log.js';
+
 const OAUTH = 'https://www.strava.com/oauth';
 const API = 'https://www.strava.com/api/v3';
 
@@ -42,7 +44,7 @@ export function tokens(t = {}) {
     };
 }
 
-async function oauthToken(env, params) {
+async function oauthToken(env, params, onTokens = null) {
     const r = await fetch(`${OAUTH}/token`, {
         method: 'POST',
         headers: {'content-type': 'application/x-www-form-urlencoded'},
@@ -50,7 +52,9 @@ async function oauthToken(env, params) {
     });
     const body = await r.json().catch(() => ({}));
     if(!r.ok) return json({error: body.message ?? `Strava answered ${r.status}`}, r.status === 400 || r.status === 401 ? 400 : 502);
-    return json(tokens(body));
+    const t = tokens(body);
+    if(onTokens) await onTokens(t);
+    return json(t);
 }
 
 export async function onRequest({request, env, params}) {
@@ -62,7 +66,11 @@ export async function onRequest({request, env, params}) {
     if(path === 'token' && method === 'POST') {
         const {code} = await request.json().catch(() => ({}));
         if(!code) return json({error: 'no code'}, 400);
-        return oauthToken(env, {code, grant_type: 'authorization_code'});
+        // someone connected their Strava: logged with who they are (log.js)
+        return oauthToken(env, {code, grant_type: 'authorization_code'}, async (t) => {
+            const name = [t.athlete?.firstname, t.athlete?.lastname].filter(Boolean).join(' ') || null;
+            await record(env, request, {kind: 'strava:connect', who: name, visitor: request.headers?.get?.('x-infergno-visitor') ?? null, data: {athlete: t.athlete?.id ?? null}});
+        });
     }
     if(path === 'refresh' && method === 'POST') {
         const {refresh_token} = await request.json().catch(() => ({}));

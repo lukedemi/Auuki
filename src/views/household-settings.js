@@ -42,7 +42,7 @@ class HouseholdSettings extends HTMLElement {
         if(!isHousehold()) {
             this.innerHTML = `
                 <div class="hh--row"><a class="hh--btn" href="/household">Household sign-in</a></div>
-                <p class="hh--note">For the household only: signs this browser in (for a month), which turns on the trainer room, debug traces and hosting group rides here. Everyone else can ignore this; the app works the same without it.</p>${msg}`;
+                <p class="hh--note">For the household only: signs this browser in (for a month), which turns on the trainer room and debug traces here, and the log at /admin. Everyone else can ignore this; the app works the same without it.</p>${msg}`;
             return;
         }
         const t = lastTransfer();
@@ -53,7 +53,7 @@ class HouseholdSettings extends HTMLElement {
                 <button type="button" data-act="transfer">Bring over from auuki.d3-mi.com</button>
                 <a class="hh--btn" href="/cdn-cgi/access/logout">Sign out</a>
             </div>
-            <p class="hh--note">The trainer room, debug traces and hosting group rides are on here. ${esc(moved)}</p>${msg}`;
+            <p class="hh--note">The trainer room and debug traces are on here; the log is at <a class="a" href="/admin">/admin</a>. ${esc(moved)}</p>${msg}`;
         this.querySelector('[data-act="transfer"]').addEventListener('click', async (e) => {
             // the popup must open inside the click, before anything is redrawn
             const btn = e.currentTarget;

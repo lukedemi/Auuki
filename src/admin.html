@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="robots" content="noindex">
+        <title>infERGno — who is doing what</title>
+        <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+        <style>
+            :root { color-scheme: dark; --bg: #14161b; --card: #1b1e24; --line: #2a2e36; --dim: #8f96a3; --ink: #e9eaee; --hot: #f2994a; --ok: #3fd08a; --bad: #ff8c8c; }
+            * { box-sizing: border-box; }
+            body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 Inter, system-ui, sans-serif; }
+            header { display: flex; align-items: center; gap: 18px; padding: 14px 20px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--bg); z-index: 2; flex-wrap: wrap; }
+            header h1 { margin: 0; font-size: 18px; } header h1 b { color: var(--hot); }
+            .tiles { display: flex; gap: 10px; flex-wrap: wrap; margin-left: auto; }
+            .tile { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 6px 12px; }
+            .tile b { display: block; font-size: 18px; } .tile span { font-size: 11px; color: var(--dim); text-transform: uppercase; letter-spacing: .05em; }
+            main { display: grid; grid-template-columns: 340px minmax(0, 1fr); min-height: calc(100vh - 66px); }
+            aside { border-right: 1px solid var(--line); overflow-y: auto; max-height: calc(100vh - 66px); position: sticky; top: 66px; }
+            .v { padding: 10px 16px; border-bottom: 1px solid var(--line); cursor: pointer; }
+            .v:hover, .v.on { background: var(--card); } .v.on { box-shadow: inset 3px 0 0 var(--hot); }
+            .v .who { font-weight: 700; } .v .meta { color: var(--dim); font-size: 12px; }
+            section { padding: 14px 20px; min-width: 0; }
+            .filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; align-items: center; }
+            input, select, button { font: inherit; color: inherit; background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
+            button { cursor: pointer; }
+            table { width: 100%; border-collapse: collapse; }
+            td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+            td.t { white-space: nowrap; color: var(--dim); font-variant-numeric: tabular-nums; }
+            td.k { white-space: nowrap; font-weight: 600; }
+            td.k.error { color: var(--bad); } td.k.server { color: var(--ok); }
+            td.w { white-space: nowrap; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+            td.d { color: #c9cdd5; font-family: ui-monospace, Menlo, monospace; font-size: 12px; word-break: break-word; }
+            .muted { color: var(--dim); }
+            @media (max-width: 860px) { main { grid-template-columns: 1fr; } aside { position: static; max-height: 260px; } }
+        </style>
+    </head>
+    <body>
+        <header>
+            <h1>inf<b>ERG</b>no · who is doing what</h1>
+            <span class="muted" id="updated"></span>
+            <div class="tiles" id="tiles"></div>
+        </header>
+        <main>
+            <aside id="visitors"></aside>
+            <section>
+                <div class="filters">
+                    <span id="showing" class="muted">Everyone</span>
+                    <select id="kind">
+                        <option value="">all events</option>
+                        <option>load</option><option>page</option><option>pick</option><option>workout</option>
+                        <option value="ride">ride:*</option><option>upload</option><option value="device">device:*</option>
+                        <option value="strava">strava:*</option><option value="rider">rider:*</option><option value="group">group:*</option>
+                        <option>ramp-test:result</option><option>ftp:set</option><option>error</option>
+                    </select>
+                    <input id="q" type="search" placeholder="search who, details, path">
+                    <button id="all" type="button">Everyone</button>
+                    <label class="muted"><input id="live" type="checkbox" checked> live</label>
+                </div>
+                <table><tbody id="events"></tbody></table>
+                <p><button id="more" type="button">Older</button></p>
+            </section>
+        </main>
+        <script type="module" src="./admin.js"></script>
+    </body>
+</html>

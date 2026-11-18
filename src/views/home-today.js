@@ -391,6 +391,7 @@ class HomeToday extends HTMLElement {
             const h = this.shown;
             if(!h) return;
             xf.dispatch(h.source === 'planned' ? 'ui:planned:select' : 'ui:workout:select', h.workout.id);
+            xf.dispatch('home:pick', {name: h.workout.meta?.name ?? null, source: h.source, ride: true});
             xf.dispatch('ui:page-set', 'home');
             return;
         }
@@ -409,6 +410,8 @@ class HomeToday extends HTMLElement {
         if(el.dataset.length) { this.filter.length = this.filter.length === el.dataset.length ? null : el.dataset.length; this.renderLib(); return; }
         if(el.dataset.id && el.dataset.source) {
             this.picked = {source: el.dataset.source, id: el.dataset.id};
+            const w = (el.dataset.source === 'planned' ? this.planned() : this.library).find((x) => String(x.id) === el.dataset.id);
+            xf.dispatch('home:pick', {name: w?.meta?.name ?? null, source: el.dataset.source});
             this.renderHero();
             this.renderWeek();
             this.renderGrid();

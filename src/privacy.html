@@ -46,7 +46,7 @@
     <body id="theme" class="dark-theme">
         <section class="wrapper">
             <h1>Privacy</h1>
-            <p>infERGno runs in your browser. It has no ads and no analytics. Its only account is your Strava one, and only if you connect it.</p>
+            <p>infERGno runs in your browser. It has no ads and no third-party analytics, but it does keep its own log of how the app is used (below). Its only account is your Strava one, and only if you connect it.</p>
 
             <h2>What stays on your device</h2>
             <p>Your rides (the recorded .fit files and their summaries), your notes, RPE and feel, the workouts you add, and the list of Bluetooth devices you paired. They are kept in this browser's own storage and are never sent to us. Your settings are kept here too, and sent to us only if you connect Strava (below). Clearing the site's data in your browser deletes what is kept here.</p>
@@ -57,8 +57,11 @@
             <p><strong>Your settings, saved to your Strava account.</strong> Once you connect Strava, infERGno saves your settings on its server under your Strava account (its number and your name), so another browser picks them up when you connect Strava there. That is everything under Settings: FTP, weight, power sources, preferences, and your intervals.icu API key if you set one. Not your rides, not your Strava access, not your paired devices. They are kept in a database on Cloudflare, updated when you change a setting, and deleted when you press Disconnect. To prove which account it is, your browser shows the server your Strava access; the server asks Strava whose it is and remembers only a fingerprint of it, for an hour.</p>
             <p><strong>Files you download</strong> (a ride's .fit or image) go wherever you save them.</p>
 
+            <h2>The app's log</h2>
+            <p>infERGno logs what happens in it so its developer can see how it is used and fix what breaks: each visit and where it came from (the referring site), the screens and tabs you open, the workouts you pick, rides started, paused, ended and saved, uploads to intervals.icu and Strava (whether they worked, not the files), the Bluetooth devices that connect (their names), connecting Strava or intervals.icu, group rides created and joined, FTP changes, ramp test results, and errors. Each browser has a random id; once you connect Strava the log carries your Strava name and number with it. It also records your browser type and the city and country Cloudflare sees the request coming from (not your address). It never includes your rides' data, your intervals.icu key or your Strava access. It is kept for 180 days, and only the developer's household can read it.</p>
+
             <h2>What the server sees</h2>
-            <p>The public infERGno is a set of static files served by Cloudflare, plus the Strava relay and the settings store described above. Loading it is an ordinary web request, which Cloudflare handles under <a href="https://www.cloudflare.com/privacypolicy/">its privacy policy</a>. infERGno itself keeps no logs, and stores nothing about you beyond the saved settings of a connected Strava account. The page's font is loaded from Google Fonts, which sees that request.</p>
+            <p>The public infERGno is a set of static files served by Cloudflare, plus the Strava relay and the settings store described above. Loading it is an ordinary web request, which Cloudflare handles under <a href="https://www.cloudflare.com/privacypolicy/">its privacy policy</a>. Beyond the app's log above and the saved settings of a connected Strava account, infERGno stores nothing about you. The page's font is loaded from Google Fonts, which sees that request.</p>
             <p>The developer's household, signed in separately, additionally sends debug traces of its use to its own server and reads one room's sensors from a home automation system. Nobody else's browser does either.</p>
 
             <h2>Source</h2>

@@ -15,7 +15,7 @@ globalThis.Response = Res;
 
 // a D1 that understands just the statements rider.js sends
 function fakeDB() {
-    const riders = new Map(), tokens = new Map();
+    const riders = new Map(), tokens = new Map(), logged = [];
     const run = (sql, a) => {
         if(/^SELECT athlete_id, name FROM rider_tokens/.test(sql)) { const t = tokens.get(a[0]); return t && t.expires_at > a[1] ? t : null; }
         if(/^DELETE FROM rider_tokens WHERE expires_at/.test(sql)) { for(const [k, t] of tokens) if(t.expires_at < a[0]) tokens.delete(k); return null; }
@@ -25,10 +25,12 @@ function fakeDB() {
         if(/^INSERT INTO riders/.test(sql)) { const old = riders.get(a[0]); riders.set(a[0], {name: a[1], settings: a[2], created_at: old?.created_at ?? a[3], updated_at: a[4], seen_at: a[5]}); return null; }
         if(/^DELETE FROM riders/.test(sql)) { riders.delete(a[0]); return null; }
         if(/^DELETE FROM rider_tokens WHERE athlete_id/.test(sql)) { for(const [k, t] of tokens) if(t.athlete_id === a[0]) tokens.delete(k); return null; }
+        if(/^SELECT 1 AS x FROM riders/.test(sql)) return riders.has(a[0]) ? {x: 1} : null;
+        if(/^INSERT INTO (events|visitors)/.test(sql)) { logged.push(sql.startsWith('INSERT INTO events') ? a[5] : null); return null; }
         throw new Error(`unexpected SQL: ${sql}`);
     };
     const prepare = (sql) => ({bind: (...a) => ({first: async () => run(sql.trim(), a), run: async () => run(sql.trim(), a), _go: () => run(sql.trim(), a)})});
-    return {prepare, batch: async (stmts) => stmts.map((s) => s._go()), _riders: riders, _tokens: tokens};
+    return {prepare, batch: async (stmts) => stmts.map((s) => s._go()), _riders: riders, _tokens: tokens, _logged: logged};
 }
 const req = (method, token, body) => ({method, headers: {get: (k) => (k.toLowerCase() === 'authorization' && token ? `Bearer ${token}` : null)}, text: async () => body ?? ''});
 const strava = (map) => { const calls = []; const f = async (url, opts) => { const t = opts.headers.authorization.split(' ')[1]; calls.push(t); const a = map[t]; return {ok: !!a, json: async () => a}; }; f.calls = calls; return f; };
@@ -59,6 +61,8 @@ describe('/api/rider', () => {
         expect((await onRequest({request: req('DELETE', 'tok'), env}, {fetcher})).status).toBe(200);
         expect(env.DB._riders.size).toBe(0);
         expect(env.DB._tokens.size).toBe(0);
+        // a new rider, and their leaving, are in the log
+        expect(env.DB._logged.filter(Boolean)).toEqual(['rider:new', 'rider:deleted']);
     });
 
     test('settings are a flat object of strings', () => {

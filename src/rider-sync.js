@@ -31,6 +31,7 @@ const PUSH_MS = 60 * 1000;
 export const NOT_SYNCED = [/^infergno:/, /^pergatory:/, /^ergatory:/, /^ble:/, /^planned$/];
 export const synced = (key) => !NOT_SYNCED.some((re) => re.test(key));
 const net = (...a) => globalThis.fetch(...a);
+const visitorHeader = () => { try { return {'x-infergno-visitor': localStorage.getItem('infergno:visitor') ?? ''}; } catch(e) { return {}; } };
 
 export function snapshot(storage = globalThis.localStorage) {
     const out = {};
@@ -52,7 +53,7 @@ export function RiderSync({storage = globalThis.localStorage, fetcher = net, tok
 
     async function call(method, body) {
         const access = await token();
-        const r = await fetcher(URL_, {method, cache: 'no-store', headers: {authorization: `Bearer ${access}`, ...(body ? {'content-type': 'application/json'} : {})}, body: body ? JSON.stringify(body) : undefined});
+        const r = await fetcher(URL_, {method, cache: 'no-store', headers: {authorization: `Bearer ${access}`, ...visitorHeader(), ...(body ? {'content-type': 'application/json'} : {})}, body: body ? JSON.stringify(body) : undefined});
         const out = await r.json().catch(() => ({}));
         return {status: r.status, ok: r.ok, body: out};
     }

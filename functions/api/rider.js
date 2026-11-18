@@ -14,6 +14,8 @@
 // D1 `DB`, tables riders and rider_tokens (schema.sql). src/rider-sync.js is
 // the other end.
 //
+import { record } from './log.js';
+
 const STRAVA_ATHLETE = 'https://www.strava.com/api/v3/athlete';
 const TOKEN_TTL_MS = 3600 * 1000;
 export const MAX_BYTES = 200 * 1024;
@@ -70,12 +72,15 @@ export async function onRequest({request, env}, deps = {}) {
         let body;
         try { body = JSON.parse(text); } catch(e) { return json({error: 'not JSON'}, 400); }
         if(!validSettings(body?.settings)) return json({error: 'settings must be an object of strings'}, 400);
+        const isNew = !(await env.DB.prepare('SELECT 1 AS x FROM riders WHERE athlete_id = ?').bind(who.id).first());
+        if(isNew) await record(env, request, {kind: 'rider:new', who: who.name, visitor: request.headers.get('x-infergno-visitor'), data: {athlete: who.id, settings: Object.keys(body.settings).length}});
         await env.DB.prepare(`INSERT INTO riders (athlete_id, name, settings, created_at, updated_at, seen_at) VALUES (?, ?, ?, ?, ?, ?)
             ON CONFLICT(athlete_id) DO UPDATE SET name = excluded.name, settings = excluded.settings, updated_at = excluded.updated_at, seen_at = excluded.seen_at`)
             .bind(who.id, who.name, JSON.stringify(body.settings), now, now, now).run();
         return json({athlete_id: who.id, name: who.name, updated_at: now});
     }
     if(request.method === 'DELETE') {
+        await record(env, request, {kind: 'rider:deleted', who: who.name, visitor: request.headers.get('x-infergno-visitor'), data: {athlete: who.id}});
         await env.DB.batch([
             env.DB.prepare('DELETE FROM riders WHERE athlete_id = ?').bind(who.id),
             env.DB.prepare('DELETE FROM rider_tokens WHERE athlete_id = ?').bind(who.id),
