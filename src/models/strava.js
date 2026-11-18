@@ -89,7 +89,7 @@ function Strava(args = {}) {
         window.history.pushState({}, document.title, window.location.pathname);
     }
 
-    // ERGatory's own Strava connection (strava-direct.js) when the rider has
+    // pERGatory's own Strava connection (strava-direct.js) when the rider has
     // made one; the ride's name and notes go with it, and the activity's id
     // comes back on the record for the end screen's View on Strava.
     // quiet: the background uploader's tries, which must not pop an error box.
@@ -110,7 +110,7 @@ function Strava(args = {}) {
             }
         }
         const blob = record.blob;
-        const workoutName = record.summary?.name ?? 'ERGatory ride';
+        const workoutName = record.summary?.name ?? 'pERGatory ride';
         const url = `${api_uri}/api/strava/upload`;
 
         const formData = new FormData();

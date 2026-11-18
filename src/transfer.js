@@ -1,30 +1,44 @@
 //
-// Moving the household from auuki.d3-mi.com to ergatory.d3-mi.com (rider,
-// Nov 17, 2026: "transfer as many settings to me as you can without me
-// having to do it").
+// Bringing a rider's things to pergatory.d3-mi.com from the addresses this
+// app lived at before: auuki.d3-mi.com, the household's (rider, Nov 17, 2026:
+// "transfer as many settings to me as you can without me having to do it"),
+// and ergatory.d3-mi.com, the public one until the rename to pERGatory
+// (rider, Nov 18, 2026: "move the domain over and add the redirect").
 //
-// A browser keeps each site's data apart, but the two share d3-mi.com, so
-// ergatory can open auuki's /transfer.html in a hidden frame: same-site, the
-// frame gets auuki's own storage and its Access sign-in. The frame answers
-// one request, from ergatory only, with what this browser holds there:
-// every localStorage setting and the saved rides and workouts. ergatory
-// stores them (transfer-in in household.js's sign-in flow) and reloads.
+// A browser keeps each address's data apart, but they all share d3-mi.com,
+// so pergatory can open the old address's /transfer.html in a hidden frame:
+// same-site, the frame gets that address's own storage (and, for auuki, its
+// Access sign-in). The frame answers one request, from pergatory only, with
+// what this browser holds there: every localStorage setting and the saved
+// rides and workouts. pergatory stores them (transfer-in.js) and reloads.
+// ergatory.d3-mi.com redirects every page here except that one
+// (functions/_middleware.js), so it can still answer.
 //
 // Not moved: Bluetooth pairings (Chrome grants those per site; pair once),
-// the ride in progress, and anything ergatory already has of its own
-// (its Strava connection, its household sign-in).
+// the ride in progress, and what belongs to an address rather than the
+// rider (its household sign-in, its transfer records, a Strava connect
+// half-done). The Strava connection itself does move: its tokens are the
+// rider's, not the address's.
 //
 
-export const FROM = 'https://auuki.d3-mi.com';
-export const TO = 'https://ergatory.d3-mi.com';
-export const REQUEST = 'ergatory-transfer-request';
-export const ANSWER = 'ergatory-transfer';
+export const TO = 'https://pergatory.d3-mi.com';
+export const SOURCES = Object.freeze({
+    // the old public address: anyone who used it, on their first visit here
+    ergatory: {origin: 'https://ergatory.d3-mi.com', household: false},
+    // the household's own copy: once signed in to the household here
+    auuki:    {origin: 'https://auuki.d3-mi.com', household: true},
+});
+export const FROM = SOURCES.auuki.origin;
+export const REQUEST = 'pergatory-transfer-request';
+export const ANSWER = 'pergatory-transfer';
 
-// settings that belong to the site, not the rider: never carried over
-export const KEEP_LOCAL = [/^ergatory:/, /^ble:remembered$/];
-export const carried = (key) => !KEEP_LOCAL.some((re) => re.test(key));
+// ergatory's keys under their new name
+export const renamed = (key) => key.replace(/^ergatory:/, 'pergatory:');
+// settings that belong to the address, not the rider: never carried over
+export const KEEP_LOCAL = [/^pergatory:household$/, /^pergatory:transfer/, /^pergatory:strava:state$/, /^ble:remembered$/];
+export const carried = (key) => !KEEP_LOCAL.some((re) => re.test(renamed(key)));
 
-// what the old site sends: its settings and its saved rides and workouts
+// what the old address sends: its settings and its saved rides and workouts
 export async function collect({storage = globalThis.localStorage, idb} = {}) {
     const settings = {};
     for(let i = 0; i < (storage?.length ?? 0); i++) {
@@ -39,14 +53,14 @@ export async function collect({storage = globalThis.localStorage, idb} = {}) {
     return {type: ANSWER, settings, activity: Array.isArray(activity) ? activity : [], workouts: Array.isArray(workouts) ? workouts : []};
 }
 
-// what ergatory does with it: settings overwrite (they are the rider's real
-// ones; this site's own keys are never touched), rides and workouts are added
-// where this site does not already have them
+// what pergatory does with it: settings overwrite (they are the rider's real
+// ones; this address's own keys are never touched), rides and workouts are
+// added where this address does not already have them
 export async function apply(data, {storage = globalThis.localStorage, idb} = {}) {
     let settings = 0, rides = 0, workouts = 0;
     for(const [k, v] of Object.entries(data?.settings ?? {})) {
         if(!carried(k) || typeof v !== 'string') continue;
-        try { storage.setItem(k, v); settings++; } catch(e) {}
+        try { storage.setItem(renamed(k), v); settings++; } catch(e) {}
     }
     if(idb) {
         const have = new Set(((await idb.getAll('activity')) ?? []).map((r) => r?.id));

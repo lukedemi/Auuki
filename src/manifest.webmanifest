@@ -1,6 +1,6 @@
 {
-    "name": "ERGatory",
-    "short_name": "ERGatory",
+    "name": "pERGatory",
+    "short_name": "pERGatory",
     "description": "Indoor trainer workouts in ERG mode",
     "start_url": "/",
     "display": "standalone",

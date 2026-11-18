@@ -67,7 +67,7 @@ const json = (body, status = 200) => new Response(JSON.stringify(body), {
     status, headers: {'content-type': 'application/json', 'cache-control': 'no-store'},
 });
 
-// Access must have let them in: on ergatory.d3-mi.com this path is one of the
+// Access must have let them in: on pergatory.d3-mi.com this path is one of the
 // few Access keeps for the household, and a request it did not sign is refused
 // here too, so the house's sensors never reach anyone else.
 export function viaAccess(request) {

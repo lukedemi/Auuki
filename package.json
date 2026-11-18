@@ -34,7 +34,7 @@
         "msgpackr-extract": false,
         "unrs-resolver": false
     },
-    "name": "ergatory",
+    "name": "pergatory",
     "dependencies": {
         "@cloudflare/realtimekit": "2.0.4"
     },
