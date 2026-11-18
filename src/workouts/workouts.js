@@ -67,6 +67,9 @@ const PURPOSE = {
     'Test':        'A benchmark. Rested legs, the same conditions each time, and no hard training the day before.',
 };
 
+// the ramp test, which ramp-test.js runs to failure
+export const RAMP_TEST = 'Test · ramp 1 min steps';
+
 // [name, category, body, {warmup, cooldown, note}]
 const short = {warmup: WARMUP_SHORT, cooldown: COOLDOWN_SHORT};
 const LIBRARY = [
@@ -129,8 +132,8 @@ const LIBRARY = [
     // Tests
     ['Test · lactate steps 9×4 min', 'Test', [ss(m(5), 0.55), ...[0.55, 0.62, 0.69, 0.76, 0.83, 0.90, 0.97, 1.04, 1.11].map((p) => ss(m(4), p))],
         {note: '4-minute stages from 55% of FTP, about 20 W a step. Take a sample in the last 30 seconds of each; stop once past about 4 mmol or a failed stage.'}],
-    ['Test · ramp 1 min steps', 'Test', Array.from({length: 21}, (_, i) => ss(m(1), Math.round((0.5 + i * 0.05) * 100) / 100)),
-        {...short, note: '1-minute steps from 50% of FTP, 5% higher each minute, until you can no longer hold it. FTP is roughly 75% of your best minute.'}],
+    [RAMP_TEST, 'Test', [ss(m(3), 0.5), ...Array.from({length: 31}, (_, i) => ss(m(1), Math.round((0.5 + i * 0.05) * 100) / 100))],
+        {...short, note: 'Ride it until you cannot: 1-minute steps from 50% of FTP, 5% higher each minute, with no top. When your cadence collapses it ends itself, drops you into the cool-down and works out your FTP from your best minute (75% of it). Ramp tests read high for riders with a big sprint; a 20-minute or lactate step test is the cross-check.'}],
     ['Test · 20 min', 'Test', [ss(m(5), 1.05), ss(m(10), EASY), ss(m(20), 1.00)],
         {note: '5 minutes hard to open up, 10 easy, then 20 minutes as hard as you can hold. Raise the target if you can. FTP is 95% of the 20-minute average.'}],
 ];
