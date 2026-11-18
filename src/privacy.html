@@ -10,7 +10,7 @@
         <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
         <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
 
-        <title>pERGatory — Privacy</title>
+        <title>infERGno — Privacy</title>
         <meta name="description" content="indoor cycling app for workouts with smart trainers and power meters over bluetooth">
 
         <link rel="preconnect" href="https://fonts.gstatic.com">
@@ -46,25 +46,25 @@
     <body id="theme" class="dark-theme">
         <section class="wrapper">
             <h1>Privacy</h1>
-            <p>pERGatory runs in your browser. It has no ads and no analytics. Its only account is your Strava one, and only if you connect it.</p>
+            <p>infERGno runs in your browser. It has no ads and no analytics. Its only account is your Strava one, and only if you connect it.</p>
 
             <h2>What stays on your device</h2>
             <p>Your rides (the recorded .fit files and their summaries), your notes, RPE and feel, the workouts you add, and the list of Bluetooth devices you paired. They are kept in this browser's own storage and are never sent to us. Your settings are kept here too, and sent to us only if you connect Strava (below). Clearing the site's data in your browser deletes what is kept here.</p>
 
             <h2>What leaves your device, and only if you ask</h2>
-            <p><strong>intervals.icu.</strong> If you paste your own intervals.icu API key into Settings, it is stored in this browser, and pERGatory uses it to send your finished rides (with their name, RPE, feel and notes) to your intervals.icu account and to read your planned workouts from it. That traffic goes straight from your browser to intervals.icu; pERGatory's server never sees it. Remove the key in Settings to stop.</p>
-            <p><strong>Strava.</strong> If you press Connect with Strava in Settings, Strava asks you to let pERGatory upload activities (and see your name). pERGatory then uploads each ride you finish to your Strava account, with its name and notes, and sends later edits of those. It reads nothing else from Strava. The access Strava grants is kept in this browser only. To complete the connection and to send rides, your browser goes through a small relay on pERGatory's server that adds the app's Strava credentials and passes the request on; it stores nothing, neither your access nor your rides. Disconnect in Settings revokes pERGatory's access at Strava and forgets it here; you can also revoke it on Strava under Settings → My Apps.</p>
-            <p><strong>Your settings, saved to your Strava account.</strong> Once you connect Strava, pERGatory saves your settings on its server under your Strava account (its number and your name), so another browser picks them up when you connect Strava there. That is everything under Settings: FTP, weight, power sources, preferences, and your intervals.icu API key if you set one. Not your rides, not your Strava access, not your paired devices. They are kept in a database on Cloudflare, updated when you change a setting, and deleted when you press Disconnect. To prove which account it is, your browser shows the server your Strava access; the server asks Strava whose it is and remembers only a fingerprint of it, for an hour.</p>
+            <p><strong>intervals.icu.</strong> If you paste your own intervals.icu API key into Settings, it is stored in this browser, and infERGno uses it to send your finished rides (with their name, RPE, feel and notes) to your intervals.icu account and to read your planned workouts from it. That traffic goes straight from your browser to intervals.icu; infERGno's server never sees it. Remove the key in Settings to stop.</p>
+            <p><strong>Strava.</strong> If you press Connect with Strava in Settings, Strava asks you to let infERGno upload activities (and see your name). infERGno then uploads each ride you finish to your Strava account, with its name and notes, and sends later edits of those. It reads nothing else from Strava. The access Strava grants is kept in this browser only. To complete the connection and to send rides, your browser goes through a small relay on infERGno's server that adds the app's Strava credentials and passes the request on; it stores nothing, neither your access nor your rides. Disconnect in Settings revokes infERGno's access at Strava and forgets it here; you can also revoke it on Strava under Settings → My Apps.</p>
+            <p><strong>Your settings, saved to your Strava account.</strong> Once you connect Strava, infERGno saves your settings on its server under your Strava account (its number and your name), so another browser picks them up when you connect Strava there. That is everything under Settings: FTP, weight, power sources, preferences, and your intervals.icu API key if you set one. Not your rides, not your Strava access, not your paired devices. They are kept in a database on Cloudflare, updated when you change a setting, and deleted when you press Disconnect. To prove which account it is, your browser shows the server your Strava access; the server asks Strava whose it is and remembers only a fingerprint of it, for an hour.</p>
             <p><strong>Files you download</strong> (a ride's .fit or image) go wherever you save them.</p>
 
             <h2>What the server sees</h2>
-            <p>The public pERGatory is a set of static files served by Cloudflare, plus the Strava relay and the settings store described above. Loading it is an ordinary web request, which Cloudflare handles under <a href="https://www.cloudflare.com/privacypolicy/">its privacy policy</a>. pERGatory itself keeps no logs, and stores nothing about you beyond the saved settings of a connected Strava account. The page's font is loaded from Google Fonts, which sees that request.</p>
+            <p>The public infERGno is a set of static files served by Cloudflare, plus the Strava relay and the settings store described above. Loading it is an ordinary web request, which Cloudflare handles under <a href="https://www.cloudflare.com/privacypolicy/">its privacy policy</a>. infERGno itself keeps no logs, and stores nothing about you beyond the saved settings of a connected Strava account. The page's font is loaded from Google Fonts, which sees that request.</p>
             <p>The developer's household, signed in separately, additionally sends debug traces of its use to its own server and reads one room's sensors from a home automation system. Nobody else's browser does either.</p>
 
             <h2>Source</h2>
-            <p>pERGatory is a modified version of <a href="https://github.com/dvmarinoff/Auuki">Auuki</a> by Dimitar Marinov, under the <a href="https://www.gnu.org/licenses/agpl-3.0.en.html">GNU AGPL v3</a>. The source code of the running version is offered in pERGatory under Settings → About.</p>
+            <p>infERGno is a modified version of <a href="https://github.com/dvmarinoff/Auuki">Auuki</a> by Dimitar Marinov, under the <a href="https://www.gnu.org/licenses/agpl-3.0.en.html">GNU AGPL v3</a>. The source code of the running version is offered in infERGno under Settings → About.</p>
 
-            <p><a href="./">Back to pERGatory</a></p>
+            <p><a href="./">Back to infERGno</a></p>
         </section>
     </body>
 </html>

@@ -1,17 +1,17 @@
 //
-// Which pERGatory this build is (rider, Nov 17, 2026: "make a public version
+// Which infERGno this build is (rider, Nov 17, 2026: "make a public version
 // of the app my dad/others can use. My version stays cf access with all my
 // flags turned on").
 //
 //   home    auuki.d3-mi.com, behind Cloudflare Access: everything, including
 //           the trainer room from Home Assistant (room.js, /api/room) and the
 //           debug traces (trace.js, /api/trace).
-//   public  pergatory.d3-mi.com, open to anyone. The household's extras
+//   public  infergno.com, open to anyone. The household's extras
 //           (the room, the traces, hosting group rides) switch on there only
 //           for a browser signed in to the household (household.js); for
 //           everyone else it never makes those calls or shows their settings.
 //
-// Set in the built page: <meta name="pergatory-flavor" content="home">, which
+// Set in the built page: <meta name="infergno-flavor" content="home">, which
 // `npm run release:public` rewrites to "public" in dist-public/index.html
 // (scripts/flavor.mjs). The source is the same for both; only that line of
 // the build differs. Anything else, or no page, is the household build.
@@ -19,7 +19,7 @@
 
 export function readFlavor(doc = (typeof document !== 'undefined' ? document : null)) {
     try {
-        return doc?.querySelector('meta[name="pergatory-flavor"]')?.content === 'public' ? 'public' : 'home';
+        return doc?.querySelector('meta[name="infergno-flavor"]')?.content === 'public' ? 'public' : 'home';
     } catch(e) {
         return 'home';
     }
@@ -32,13 +32,13 @@ export const FLAVOR = readFlavor();
 export const flags = Object.freeze({
     room:   true,
     traces: true,
-    // Strava only on the public pERGatory (rider, Nov 17, 2026: "we'll
-    // standardize on ergatory for anything strava"): its Strava app's callback
-    // domain is pergatory.d3-mi.com, and the household's own rides reach
-    // Strava through bikes.
+    // Strava only on the public site (rider, Nov 17, 2026: "we'll
+    // standardize on ergatory for anything strava", the public app's name
+    // then): its Strava app's callback domain is infergno.com, and the
+    // household's own rides reach Strava through bikes.
     strava: FLAVOR === 'public',
 });
 
-export const PUBLIC_URL = 'https://pergatory.d3-mi.com';
+export const PUBLIC_URL = 'https://infergno.com';
 
-export const APP_NAME = 'pERGatory';
+export const APP_NAME = 'infERGno';

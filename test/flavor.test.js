@@ -6,11 +6,11 @@ import { readFlavor } from '../src/flavor.js';
 
 const page = (content) => {
     const doc = document.implementation.createHTMLDocument('x');
-    if(content) { const m = doc.createElement('meta'); m.name = 'pergatory-flavor'; m.content = content; doc.head.appendChild(m); }
+    if(content) { const m = doc.createElement('meta'); m.name = 'infergno-flavor'; m.content = content; doc.head.appendChild(m); }
     return doc;
 };
 
-describe('the two pERGatory builds', () => {
+describe('the two infERGno builds', () => {
     test('the page says which; anything else is the household build', () => {
         expect(readFlavor(page('public'))).toBe('public');
         expect(readFlavor(page('home'))).toBe('home');
@@ -20,6 +20,6 @@ describe('the two pERGatory builds', () => {
     test('the household build has the room and the traces', () => {
         const { flags, APP_NAME } = require('../src/flavor.js');
         expect(flags).toEqual({room: true, traces: true, strava: false});
-        expect(APP_NAME).toBe('pERGatory');
+        expect(APP_NAME).toBe('infERGno');
     });
 });

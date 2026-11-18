@@ -1,18 +1,20 @@
 //
-// Bringing a rider's things to pergatory.d3-mi.com from the addresses this
+// Bringing a rider's things to infergno.com from the addresses this
 // app lived at before: auuki.d3-mi.com, the household's (rider, Nov 17, 2026:
 // "transfer as many settings to me as you can without me having to do it"),
-// and ergatory.d3-mi.com, the public one until the rename to pERGatory
-// (rider, Nov 18, 2026: "move the domain over and add the redirect").
+// and the public ones before infergno.com: ergatory.d3-mi.com (ERGatory) and
+// pergatory.d3-mi.com (pERGatory).
 //
-// A browser keeps each address's data apart, but they all share d3-mi.com,
-// so pergatory can open the old address's /transfer.html in a hidden frame:
-// same-site, the frame gets that address's own storage (and, for auuki, its
-// Access sign-in). The frame answers one request, from pergatory only, with
-// what this browser holds there: every localStorage setting and the saved
-// rides and workouts. pergatory stores them (transfer-in.js) and reloads.
-// ergatory.d3-mi.com redirects every page here except that one
-// (functions/_middleware.js), so it can still answer.
+// A browser keeps each address's data apart. infERGno opens the old address's
+// /transfer page in a small popup window (transfer-in.js), on a click: a
+// popup is a top-level window, so it sees that address's own storage and,
+// for auuki, its Access sign-in, which a frame inside infergno.com would not
+// (a different site: Chrome partitions a cross-site frame's storage and
+// withholds its cookies). The page answers one request, from infergno.com
+// only, with what this browser holds there: every localStorage setting and
+// the saved rides and workouts, then closes. infERGno stores them and
+// reloads. The old public addresses redirect every page here except that
+// one (functions/_middleware.js), so it can still answer.
 //
 // Not moved: Bluetooth pairings (Chrome grants those per site; pair once),
 // the ride in progress, and what belongs to an address rather than the
@@ -21,21 +23,23 @@
 // rider's, not the address's.
 //
 
-export const TO = 'https://pergatory.d3-mi.com';
+export const TO = 'https://infergno.com';
 export const SOURCES = Object.freeze({
-    // the old public address: anyone who used it, on their first visit here
-    ergatory: {origin: 'https://ergatory.d3-mi.com', household: false},
+    // the old public addresses: anyone who used them, on their first visit
+    // here, oldest first so the newer settings win
+    ergatory:  {origin: 'https://ergatory.d3-mi.com', household: false},
+    pergatory: {origin: 'https://pergatory.d3-mi.com', household: false},
     // the household's own copy: once signed in to the household here
     auuki:    {origin: 'https://auuki.d3-mi.com', household: true},
 });
 export const FROM = SOURCES.auuki.origin;
-export const REQUEST = 'pergatory-transfer-request';
-export const ANSWER = 'pergatory-transfer';
+export const REQUEST = 'infergno-transfer-request';
+export const ANSWER = 'infergno-transfer';
 
-// ergatory's keys under their new name
-export const renamed = (key) => key.replace(/^ergatory:/, 'pergatory:');
+// the app's own keys from the old addresses under the new name
+export const renamed = (key) => key.replace(/^(ergatory|pergatory):/, 'infergno:');
 // settings that belong to the address, not the rider: never carried over
-export const KEEP_LOCAL = [/^pergatory:household$/, /^pergatory:transfer/, /^pergatory:strava:state$/, /^ble:remembered$/];
+export const KEEP_LOCAL = [/^infergno:household$/, /^infergno:transfer/, /^infergno:strava:state$/, /^ble:remembered$/];
 export const carried = (key) => !KEEP_LOCAL.some((re) => re.test(renamed(key)));
 
 // what the old address sends: its settings and its saved rides and workouts
@@ -53,7 +57,7 @@ export async function collect({storage = globalThis.localStorage, idb} = {}) {
     return {type: ANSWER, settings, activity: Array.isArray(activity) ? activity : [], workouts: Array.isArray(workouts) ? workouts : []};
 }
 
-// what pergatory does with it: settings overwrite (they are the rider's real
+// what infergno does with it: settings overwrite (they are the rider's real
 // ones; this address's own keys are never touched), rides and workouts are
 // added where this address does not already have them
 export async function apply(data, {storage = globalThis.localStorage, idb} = {}) {

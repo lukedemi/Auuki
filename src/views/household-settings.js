@@ -1,5 +1,5 @@
 //
-// Settings > Household, on the public pERGatory only (household.js,
+// Settings > Household, on the public infERGno only (household.js,
 // transfer-in.js): sign in to the household for its extras on this site,
 // see who is signed in, sign out, and bring settings and rides over from
 // auuki.d3-mi.com again.
@@ -7,7 +7,7 @@
 import { xf } from '../functions.js';
 import { FLAVOR } from '../flavor.js';
 import { isHousehold, householdEmail, check } from '../household.js';
-import { lastTransfer, transfer, NOTICE } from '../transfer-in.js';
+import { lastTransfer, transferAndReload } from '../transfer-in.js';
 
 const style = `
 household-settings { display: block; width: 100%; font-size: 15px; text-align: left; }
@@ -34,13 +34,6 @@ class HouseholdSettings extends HTMLElement {
             document.head.appendChild(el);
         }
         this.msg = null;
-        try {
-            const n = JSON.parse(sessionStorage.getItem(NOTICE) ?? 'null');
-            if(n) {
-                sessionStorage.removeItem(NOTICE);
-                this.msg = ['ok', `Brought over from ${n.from ?? 'auuki.d3-mi.com'}: ${n.settings} settings, ${n.rides} rides, ${n.workouts} workouts. Pair your devices once here.${n.from === 'ergatory.d3-mi.com' ? ' pERGatory moved here from ergatory.d3-mi.com.' : ''}`];
-            }
-        } catch(e) {}
         xf.sub('household:status', () => this.render());
         this.render();
     }
@@ -62,13 +55,11 @@ class HouseholdSettings extends HTMLElement {
             </div>
             <p class="hh--note">The trainer room, debug traces and hosting group rides are on here. ${esc(moved)}</p>${msg}`;
         this.querySelector('[data-act="transfer"]').addEventListener('click', async (e) => {
-            e.currentTarget.disabled = true;
-            this.msg = ['ok', 'Bringing settings and rides over…'];
-            this.render();
+            // the popup must open inside the click, before anything is redrawn
+            const btn = e.currentTarget;
+            btn.disabled = true;
             try {
-                const res = await transfer('auuki');
-                sessionStorage.setItem(NOTICE, JSON.stringify(res));
-                location.reload();
+                await transferAndReload('auuki');
             } catch(err) {
                 this.msg = ['bad', err.message];
                 this.render();

@@ -2554,6 +2554,9 @@ body.white-theme {
     padding-right: 1.5em;
 }
 .planned--actions [hidden] { display: none !important; }
+/* Home's top: the move card (move-in.js) and the rider's Strava (strava-home.js) */
+.wk--top move-in:not([hidden]) { margin: 0.8em 0.8em 0; }
+#view--workouts-workouts > .wk--top move-in:not([hidden]) { margin: 0 0 0.6em; }
 .list--heading--cont.control:has(.planned--connect:not([hidden])) { grid-template-columns: auto 1fr; gap: 1em; }
 /* the intervals.icu button before it is connected: says what it is for */
 .planned--connect {
@@ -4229,13 +4232,13 @@ and (orientation: landscape) {
         height: calc(100vh - 141px);
         overflow: hidden;
     }
-    #view--workouts-workouts > strava-home {
+    #view--workouts-workouts > .wk--top {
         grid-column: 1;
         grid-row: 1;
-        margin: 0;
         padding: 0.9em 1em 0.3em;
         border-right: 1px solid var(--border-color);
     }
+    #view--workouts-workouts > .wk--top strava-home { margin: 0; }
     #view--workouts-workouts .wk--lists {
         grid-column: 1;
         grid-row: 2;

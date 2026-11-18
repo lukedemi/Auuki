@@ -31,5 +31,5 @@ const paths = flavor === 'public'
     : [];
 
 if(!existsSync(dist)) { console.error(`source.mjs: no ${dist}/`); process.exit(1); }
-execSync(`git archive --format=tar.gz --prefix=pergatory-${sha}/ -o ${dist}/source.tar.gz HEAD ${paths.join(' ')}`, {stdio: 'inherit'});
-console.log(`source.tar.gz: pergatory-${sha} (${flavor}${paths.length ? ': ' + paths.join(', ') : ': whole repository'})`);
+execSync(`git archive --format=tar.gz --prefix=infergno-${sha}/ -o ${dist}/source.tar.gz HEAD ${paths.join(' ')}`, {stdio: 'inherit'});
+console.log(`source.tar.gz: infergno-${sha} (${flavor}${paths.length ? ': ' + paths.join(', ') : ': whole repository'})`);

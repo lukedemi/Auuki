@@ -35,7 +35,7 @@
         "msgpackr-extract": false,
         "unrs-resolver": false
     },
-    "name": "pergatory",
+    "name": "infergno",
     "dependencies": {
         "@cloudflare/realtimekit": "2.0.4"
     },

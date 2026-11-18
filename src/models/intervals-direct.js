@@ -124,7 +124,7 @@ async function upload(blob, {name, externalId} = {}) {
     if(externalId) params.set('external_id', externalId);
 
     const form = new FormData();
-    form.append('file', blob, 'pergatory.fit');
+    form.append('file', blob, 'infergno.fit');
 
     return request(`/activities?${params}`, {method: 'POST', body: form});
 }

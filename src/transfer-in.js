@@ -1,44 +1,45 @@
 //
-// On pergatory.d3-mi.com: bring the rider's settings, rides and workouts over
-// from the addresses this app lived at before (transfer.js), each once and by
-// itself: ergatory.d3-mi.com for anyone, auuki.d3-mi.com once signed in to
-// the household (again from Settings > Household). Then reload, so the app
-// starts on them.
+// On infergno.com: bring the rider's settings, rides and workouts over from
+// an address this app lived at before (transfer.js): ergatory.d3-mi.com or
+// pergatory.d3-mi.com for anyone, auuki.d3-mi.com for the household. On a
+// click (views/move-in.js, Settings > Household), because it opens the old
+// address in a small popup window. Then reload, so the app starts on them.
 //
 import { idb } from './storage/idb.js';
 import { SOURCES, TO, REQUEST, ANSWER, apply } from './transfer.js';
-import { FLAVOR } from './flavor.js';
-import { whenHousehold } from './household.js';
 
-const DONE = (name) => `pergatory:transfer:${name}`;
-export const NOTICE = 'pergatory:transfer:notice';
-const WAIT_MS = 20000;
+const DONE = (name) => `infergno:transfer:${name}`;
+export const NOTICE = 'infergno:transfer:notice';
+const WAIT_MS = 120000;     // long enough to sign in to Access in the popup
 
 export function lastTransfer(name = 'auuki') {
     try { return JSON.parse(localStorage.getItem(DONE(name)) ?? 'null'); } catch(e) { return null; }
 }
 
+// must run inside a click: browsers block a popup opened any other way
 export function pull(from, {waitMs = WAIT_MS} = {}) {
     return new Promise((resolve, reject) => {
-        const frame = document.createElement('iframe');
-        frame.src = `${from}/transfer`;   // Pages' own address for transfer.html
-        frame.style.display = 'none';
-        frame.setAttribute('aria-hidden', 'true');
-        const timer = setTimeout(() => finish(new Error(`${from} did not answer: open it once in this browser, signed in, then try again`)), waitMs);
+        const w = window.open(`${from}/transfer`, 'infergno-transfer', 'popup,width=460,height=420');
+        if(!w) { reject(new Error('the browser blocked the window that brings them over; allow pop-ups for infergno.com and press again')); return; }
+        const timer = setTimeout(() => finish(new Error(`${from.replace('https://', '')} did not answer`)), waitMs);
+        const closed = setInterval(() => { if(w.closed) finish(new Error('the window was closed before it finished')); }, 500);
+        let done = false;
         function finish(err, data) {
+            if(done) return;
+            done = true;
             clearTimeout(timer);
+            clearInterval(closed);
             window.removeEventListener('message', onMessage);
-            frame.remove();
+            try { if(!w.closed) w.close(); } catch(e) {}
             err ? reject(err) : resolve(data);
         }
         function onMessage(e) {
-            if(e.origin !== from) return;
-            if(e.data?.type === 'pergatory-transfer-ready') frame.contentWindow.postMessage({type: REQUEST}, from);
+            if(e.origin !== from || e.source !== w) return;
+            if(e.data?.type === 'infergno-transfer-ready') w.postMessage({type: REQUEST}, from);
             else if(e.data?.type === ANSWER) finish(null, e.data);
-            else if(e.data?.type === 'pergatory-transfer-error') finish(new Error(e.data.error));
+            else if(e.data?.type === 'infergno-transfer-error') finish(new Error(e.data.error));
         }
         window.addEventListener('message', onMessage);
-        document.body.appendChild(frame);
     });
 }
 
@@ -52,23 +53,26 @@ export async function transfer(name = 'auuki') {
     return record;
 }
 
-async function once(name) {
-    if(lastTransfer(name)) return;
-    try {
-        const res = await transfer(name);
-        if(res.settings || res.rides || res.workouts) {
-            sessionStorage.setItem(NOTICE, JSON.stringify(res));
-            location.reload();
-        }
-    } catch(e) {
-        try { localStorage.setItem(DONE(name), JSON.stringify({at: Date.now(), error: e.message})); } catch(_) {}
-        console.warn(`transfer from ${SOURCES[name].origin}:`, e.message);
-    }
+// bring one over and reload on it, from a click
+export async function transferAndReload(name) {
+    const res = await transfer(name);
+    try { sessionStorage.setItem(NOTICE, JSON.stringify(res)); } catch(e) {}
+    location.reload();
+    return res;
 }
 
-// ergatory first, for anyone; then auuki, for the household
-export function auto() {
-    if(FLAVOR !== 'public' || typeof location === 'undefined' || location.origin !== TO) return;
-    const first = once('ergatory');
-    whenHousehold(() => first.then(() => once('auuki')));
+// which old address sent this browser here (the redirect adds ?moved=)
+export const MOVED_KEY = 'infergno:moved-from';
+export function noteMovedFrom(search = location.search) {
+    const p = new URLSearchParams(search);
+    const name = p.get('moved');
+    if(!name || !SOURCES[name]) return null;
+    try { localStorage.setItem(MOVED_KEY, name); } catch(e) {}
+    p.delete('moved');
+    const q = p.toString();
+    try { history.replaceState({}, document.title, location.pathname + (q ? `?${q}` : '') + location.hash); } catch(e) {}
+    return name;
+}
+export function movedFrom() {
+    try { return localStorage.getItem(MOVED_KEY); } catch(e) { return null; }
 }

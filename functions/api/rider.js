@@ -1,5 +1,5 @@
 //
-// /api/rider — a pERGatory rider's saved settings, keyed by their Strava
+// /api/rider — a infERGno rider's saved settings, keyed by their Strava
 // account (rider, Nov 18, 2026: "keep a database of every person who logs in
 // with strava all their settings, etc - essentially that's their username").
 //
