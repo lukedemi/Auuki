@@ -76,3 +76,8 @@ export function noteMovedFrom(search = location.search) {
 export function movedFrom() {
     try { return localStorage.getItem(MOVED_KEY); } catch(e) { return null; }
 }
+
+// read ?moved= as this module loads: imports run before index.js's own code,
+// and the Home card (views/move-in.js, which imports this) draws as soon as
+// it is defined
+if(typeof location !== 'undefined' && typeof history !== 'undefined') noteMovedFrom();
