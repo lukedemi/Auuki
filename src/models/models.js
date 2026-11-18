@@ -348,7 +348,9 @@ class Page extends Model {
     postInit(args) {
         this.values = ['settings', 'home', 'workouts'];
     }
-    defaultValue() { return 'home'; }
+    // the app opens on the workout selector, called Home since Nov 18, 2026
+    // ('home' is the live ride screen, the menu's Ride)
+    defaultValue() { return 'workouts'; }
     defaultIsValid(value) { return this.values.includes(value); }
 }
 

@@ -45,3 +45,25 @@ CREATE TABLE IF NOT EXISTS group_riders (
     avg_w INTEGER, np_w INTEGER, avg_hr INTEGER, kj INTEGER,   -- the workout portion
     PRIMARY KEY (ride_id, rider_id)
 );
+
+-- pERGatory riders (rider, Nov 18, 2026: "keep a database of every person who
+-- logs in with strava all their settings"), written by functions/api/rider.js.
+-- One row per Strava athlete who connected on pergatory.d3-mi.com: their
+-- settings as the app keeps them in the browser, so a new browser picks them
+-- up on connecting. Deleted on Disconnect. Their Strava tokens are never here.
+CREATE TABLE IF NOT EXISTS riders (
+    athlete_id  INTEGER PRIMARY KEY,  -- Strava's
+    name        TEXT,                 -- as Strava has it
+    settings    TEXT NOT NULL,        -- JSON: localStorage key -> string
+    created_at  INTEGER NOT NULL,     -- ms
+    updated_at  INTEGER NOT NULL,     -- ms, the last save of settings
+    seen_at     INTEGER NOT NULL      -- ms, the last time the app asked
+);
+-- who a Strava access token belongs to, so each request does not ask Strava
+-- (tokens live 6 h; a row lives 1 h). Only the token's SHA-256 is kept.
+CREATE TABLE IF NOT EXISTS rider_tokens (
+    token_hash  TEXT PRIMARY KEY,
+    athlete_id  INTEGER NOT NULL,
+    name        TEXT,
+    expires_at  INTEGER NOT NULL      -- ms
+);

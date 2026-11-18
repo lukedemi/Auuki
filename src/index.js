@@ -17,6 +17,7 @@ import './watch.js';
 import './group/start.js';
 import './course.js';
 import './lock.js';
+import './start-page.js';
 
 function startServiceWorker() {
     if('serviceWorker' in navigator) {

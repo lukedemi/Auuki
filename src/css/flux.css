@@ -2553,6 +2553,17 @@ body.white-theme {
     justify-content: flex-end;
     padding-right: 1.5em;
 }
+.planned--actions [hidden] { display: none !important; }
+.list--heading--cont.control:has(.planned--connect:not([hidden])) { grid-template-columns: auto 1fr; gap: 1em; }
+/* the intervals.icu button before it is connected: says what it is for */
+.planned--connect {
+    display: inline-flex; align-items: center; gap: 0.6em; align-self: center;
+    padding: 0.5em 0.9em; border-radius: 0.6em; text-decoration: none; text-transform: none;
+    font-size: 0.95em; font-weight: 600; line-height: 1.2; color: var(--text-color, #fff);
+    background: var(--white-opacity-01, rgba(255,255,255,0.08)); border: 1px solid var(--white-opacity-02, rgba(255,255,255,0.15));
+}
+.planned--connect:hover { filter: brightness(1.25); }
+.planned--connect--icon { width: 1.4em; height: 1.4em; flex: none; }
 .planned--empty {
     display: grid;
     font-size: var(--workout--name-font-size);
@@ -4161,7 +4172,8 @@ and (orientation: landscape) {
 
 /* the public build (flavor.js): what only the household copy has */
 html[data-flavor="public"]:not([data-household]) .home-only,
-html[data-flavor="public"]:not([data-household]) room-status { display: none !important; }
+html[data-flavor="public"]:not([data-household]) room-status,
+html[data-flavor="public"]:not([data-household]) group-create { display: none !important; }
 html:not([data-flavor="public"]) .public-only,
 html[data-household] .public-only { display: none !important; }
 
@@ -4213,19 +4225,27 @@ and (orientation: landscape) {
     #view--workouts-workouts.active {
         display: grid;
         grid-template-columns: var(--wk-list-w) minmax(0, 1fr);
+        grid-template-rows: auto minmax(0, 1fr);
         height: calc(100vh - 141px);
         overflow: hidden;
     }
-    #view--workouts-workouts .wk--lists {
+    #view--workouts-workouts > strava-home {
         grid-column: 1;
         grid-row: 1;
+        margin: 0;
+        padding: 0.9em 1em 0.3em;
+        border-right: 1px solid var(--border-color);
+    }
+    #view--workouts-workouts .wk--lists {
+        grid-column: 1;
+        grid-row: 2;
         border-right: 1px solid var(--border-color);
         overflow-y: auto;
         min-height: 0;
     }
     #view--workouts-workouts .wk--pane {
         grid-column: 2;
-        grid-row: 1;
+        grid-row: 1 / span 2;
         overflow-y: auto;
         min-height: 0;
         padding: 1.8em 2.4em 2em;
