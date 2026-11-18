@@ -18,6 +18,10 @@ import { xf } from '../functions.js';
 import { models } from '../models/models.js';
 import { status, pctOfTarget } from '../group/riders.js';
 import { rideLink } from '../group/group.js';
+import { FLAVOR } from '../flavor.js';
+import { isHousehold } from '../household.js';
+import strava from '../models/strava-direct.js';
+import connectButton from 'url:../images/connections/strava/btn_strava_connect_with_orange.svg';
 
 const ZONE_VAR = {
     one: '--zone-gray', two: '--zone-blue', three: '--zone-teal', four: '--zone-green',
@@ -543,19 +547,37 @@ class GroupCreate extends HTMLElement {
         </div>`;
         this.querySelector('.gc--go').addEventListener('click', () => this.create());
     }
+    // anyone signed in with Strava may host (rider, Nov 18, 2026); the
+    // household too. Anyone else is asked to sign in, right here.
+    async signIn($msg) {
+        $msg.className = 'gc--msg';
+        $msg.innerHTML = '<div>Sign in with Strava to host a group ride.</div>';
+        const cfg = await strava.config().catch(() => null);
+        if(!cfg?.client_id) { $msg.innerHTML = '<div>Sign in with Strava to host a group ride (Settings → Strava).</div>'; return; }
+        $msg.innerHTML = `<div>Sign in with Strava to host a group ride.</div>
+            <div class="gc--row"><a class="gc--strava" href="${esc(strava.connectUrl(cfg.client_id))}"><img src="${connectButton}" alt="Connect with Strava" style="height:40px;display:block"></a></div>`;
+        $msg.querySelector('.gc--strava').addEventListener('click', (e) => { e.currentTarget.href = strava.connectUrl(cfg.client_id); });
+    }
     async create() {
         const $msg = this.querySelector('.gc--msg');
         const startAt = new Date(this.querySelector('.gc--start').value).getTime();
         const title = this.querySelector('.gc--title').value.trim();
+        const household = FLAVOR !== 'public' || isHousehold();
+        if(!household && !strava.isConnected()) return this.signIn($msg);
         $msg.className = 'gc--msg';
         $msg.textContent = 'Creating…';
         try {
+            const headers = {'Content-Type': 'application/json'};
+            try { headers['x-infergno-visitor'] = localStorage.getItem('infergno:visitor') ?? ''; } catch(e) {}
+            if(strava.isConnected()) headers.authorization = `Bearer ${await strava.token()}`;
             const res = await fetch('/api/host/group', {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
+                method: 'POST', headers,
                 body: JSON.stringify({title, startAt, workout: this.workout}),
             });
             const body = await res.json().catch(() => ({}));
+            if(res.status === 401 && body.signIn === 'strava') return this.signIn($msg);
             if(!res.ok) throw new Error(body.error ?? `failed (${res.status})`);
+            xf.dispatch('group:created', {title, startAt, workout: this.workout?.meta?.name ?? null, id: body.id});
             const guest = rideLink(body.guestOrigin || location.origin, body.id, body.joinKey);
             const mine = rideLink(location.origin, body.id, body.joinKey, body.hostKey);
             $msg.innerHTML = `<div>Send this link to everyone riding (they can join from 15 minutes before the start):</div>

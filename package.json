@@ -6,7 +6,8 @@
     "source": [
         "src/index.html",
         "src/transfer.html",
-        "src/privacy.html"
+        "src/privacy.html",
+        "src/admin.html"
     ],
     "scripts": {
         "test": "jest",
