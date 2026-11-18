@@ -4325,3 +4325,29 @@ and (orientation: landscape) {
         margin-top: 0;
     }
 }
+
+/* Home, design A (views/home-today.js; rider, Nov 18, 2026). The upstream
+   lists and detail pane stay in the page for what they still carry, never
+   shown. On a wide screen the page gets a proper header (brand, Home ·
+   Activities · Builder · Ride report, Ride screen and Settings on the right)
+   and loses the bottom bar, which belongs to the ride screen. */
+#view--workouts-workouts > .wk--pane,
+#view--workouts-workouts > .wk--lists { display: none !important; }
+#view--workouts-workouts.active { display: block !important; }
+.hdr--brand, .hdr--right { display: none; }
+@media only screen and (min-width: 900px) {
+    #workouts-page .library--switch--group {
+        display: flex; align-items: center; gap: 26px; height: 58px; padding: 0 24px;
+        border-bottom: 1px solid var(--border-color); background: rgba(0,0,0,.18);
+    }
+    #workouts-page .library--switch--heading {
+        line-height: 58px; font-size: 14.5px; text-transform: none; letter-spacing: 0; padding: 0;
+    }
+    .hdr--brand { display: block; font-weight: 800; font-size: 20px; letter-spacing: -.2px; margin-right: 10px; }
+    .hdr--brand b { color: #f2994a; font-weight: 800; }
+    .hdr--right { display: flex; align-items: center; gap: 20px; margin-left: auto; }
+    .hdr--link { cursor: pointer; font-size: 14px; opacity: .75; }
+    .hdr--link:hover { opacity: 1; }
+    #view--workouts-workouts.active { height: calc(100vh - 58px); overflow-y: auto; }
+    body:has(#workouts-page.active) .fixed-bottom { display: none; }
+}
