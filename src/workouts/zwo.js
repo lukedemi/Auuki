@@ -102,6 +102,17 @@ function isTextEventTag(name) {
     return equals(String(name).toLowerCase(), 'textevent');
 }
 
+// A cue that only says to press lap (rider, Nov 26, 2026: "after an interval
+// the top panel was covered with something that said, please lap or press
+// lap ... let's figure out why it did that and how to remove it"). intervals.icu
+// writes "Press lap" into the .zwo for a step planned as "until lap press",
+// which on a head unit waits for the lap button; the .zwo carries the words
+// but not the wait, and this app runs every step for its time, so the
+// instruction means nothing here and is not shown. Every other cue stays.
+export function isLapInstruction(message) {
+    return /^\s*(please\s+)?(press\s+|hit\s+|push\s+)?(the\s+)?lap(\s+button)?\s*[.!]*\s*$/i.test(String(message ?? ''));
+}
+
 function readTextEvents(el) {
     const nodes = el.children || [];
     const acc   = [];
@@ -109,7 +120,8 @@ function readTextEvents(el) {
     for(let i = 0; i < nodes.length; i++) {
         const child = nodes[i];
         if(isTextEventTag(child.tagName)) {
-            acc.push(Elements.TextEvent.read({el: child}));
+            const event = Elements.TextEvent.read({el: child});
+            if(!isLapInstruction(event?.message)) acc.push(event);
         }
     }
 

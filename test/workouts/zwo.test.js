@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 
-import { zwo } from '../../src/workouts/zwo.js';
+import { zwo, isLapInstruction } from '../../src/workouts/zwo.js';
 import { repeat } from '../../src/functions.js';
 
 import { JSDOM } from 'jsdom';
@@ -280,5 +280,28 @@ describe('Zwo', () => {
         const res = zwo.readToInterval(input);
         expect(res.intervals[0].steps[0].messages).toStrictEqual([{duration: 10, offset: 0, message: 'Alcohol wipe the finger'}]);
         expect(res.intervals[1].steps[0].messages).toStrictEqual([{duration: 10, offset: 0, message: 'Prick, test the second drop'}]);
+    });
+});
+
+describe('cues from intervals.icu', () => {
+    // the shape intervals.icu sends for a step planned "until lap press"
+    const plan = `<workout_file><name>Capped</name><workout>
+        <SteadyState show_avg="1" Power="0.65" Duration="600"><textevent message="Press lap" duration="10"/></SteadyState>
+        <SteadyState show_avg="1" Power="0.88" Duration="720"><textevent message="1/5" duration="10"/></SteadyState>
+        <SteadyState show_avg="1" Power="0.55" Duration="240"><textevent message="Press lap" duration="10"/></SteadyState>
+        <SteadyState show_avg="1" Power="0.55" Duration="240"><textevent message="Sample lactate, then press lap" duration="10"/></SteadyState>
+    </workout></workout_file>`;
+
+    test('a "Press lap" cue is not shown (there is no lap to wait for here); every other cue is', () => {
+        const w = zwo.readToInterval(plan);
+        const cues = w.intervals.map((iv) => (iv.steps[0].messages ?? []).map((m) => m.message));
+        expect(cues).toEqual([[], ['1/5'], [], ['Sample lactate, then press lap']]);
+        // the steps themselves are untouched
+        expect(w.intervals.map((iv) => iv.steps[0].duration)).toEqual([600, 720, 240, 240]);
+    });
+
+    test('what counts as only a lap instruction', () => {
+        for(const m of ['Press lap', 'press lap.', 'Please press lap', 'LAP', 'Hit the lap button!', ' Push lap ']) expect(isLapInstruction(m)).toBe(true);
+        for(const m of ['1/5', 'Lap 2 of 5', 'Sample lactate, then press lap', 'Laps of the hill', '']) expect(isLapInstruction(m)).toBe(false);
     });
 });
