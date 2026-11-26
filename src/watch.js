@@ -5,6 +5,7 @@ import { models } from './models/models.js';
 import { ControlMode, } from './ble/enums.js';
 import { TimerStatus, EventType, } from './activity/enums.js';
 import { extendInterval } from './workouts/extend.js';
+import { isLapInstruction } from './workouts/zwo.js';
 
 // const timer = new Worker('./timer.js');
 const timer = new Worker(new URL('./timer.js', import.meta.url));
@@ -612,6 +613,8 @@ function flattenMessages(intervals) {
                 const textEvent = messages[m];
 
                 if(!exists(textEvent.offset)) continue;
+                // a plan cached before zwo.js dropped them may still carry one
+                if(isLapInstruction(textEvent.message)) continue;
 
                 const start    = cursor + textEvent.offset;
                 const duration = exists(textEvent.duration) ? textEvent.duration : defaultDuration;
