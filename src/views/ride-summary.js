@@ -53,11 +53,10 @@ ride-summary .rs--stats { display: flex; flex-wrap: wrap; gap: 6px 34px; margin:
 ride-summary .rs--stat b { display: block; line-height: 1.15; font-size: 27px; font-variant-numeric: tabular-nums; }
 ride-summary .rs--stat span { display: block; line-height: 1.3; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.6; }
 ride-summary .rs--room { margin: -8px 10px 16px; font-size: 15px; opacity: 0.75; font-variant-numeric: tabular-nums; }
-/* the image is a 4:5 poster (poster.js): its column is as wide as it is */
-ride-summary .rs--grid { display: grid; grid-template-columns: max-content minmax(300px, 1fr); gap: 32px; align-items: start; }
-@media (max-width: 900px) { ride-summary .rs--grid { grid-template-columns: 1fr; } ride-summary .rs--img { height: auto; width: 100%; } }
+ride-summary .rs--grid { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(300px, 1fr); gap: 26px; align-items: start; }
+@media (max-width: 900px) { ride-summary .rs--grid { grid-template-columns: 1fr; } }
 ride-summary .rs--img {
-    height: min(60vh, 640px); width: auto; max-width: 100%; aspect-ratio: 1200 / 1500; border-radius: 10px; background: #f4efe3; display: block; object-fit: contain;
+    width: 100%; aspect-ratio: 1500 / 1000; border-radius: 10px; background: #f4efe3; display: block; object-fit: contain;
 }
 ride-summary h3 { margin: 0 0 8px; font-size: 14px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.65; font-weight: 600; }
 ride-summary section + section { margin-top: 20px; }
@@ -321,7 +320,7 @@ class RideSummary extends HTMLElement {
 
     // the ride image (poster.js, Nov 26, 2026)
     poster() {
-        return posterSvg(cardModel(this.chart, {name: this.summary.name}), {date: this.summary.timestamp});
+        return posterSvg(cardModel(this.chart, {name: this.summary.name}));
     }
 
     async savePng($btn) {

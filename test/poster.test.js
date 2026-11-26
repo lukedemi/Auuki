@@ -52,30 +52,45 @@ describe('a ramp is one sloped block', () => {
 
 describe('the poster', () => {
     const reps = [0, 1, 2, 3, 4].map((i) => block(1200 + i * 660, 480, 0.88));
-    const svg = posterSvg(ride([block(0, 1200, 0.6), ...reps], reps.map((b) => ({s0: b.s0, s1: b.s1, target: b.lo}))), {date: Date.UTC(2026, 10, 13, 15)});
-    test("carries its fonts, the headline, the reps' target, the four numbers and infERGno.com", () => {
-        expect(svg).toMatch(/^<svg[^>]*width="1200" height="1500"/);
+    const m = ride([block(0, 1200, 0.6), ...reps], reps.map((b) => ({s0: b.s0, s1: b.s1, target: b.lo})));
+    const svg = posterSvg(m);
+    test('3:2, its fonts inside, the name as a label, and infERGno.com', () => {
+        expect(svg).toMatch(/^<svg[^>]*width="1500" height="1000"/);
         expect(svg).toContain("@font-face{font-family:'InfergnoDisplay'");
-        expect(svg).toContain('>5×8<');
-        expect(svg).toContain('at 248 W · 88% of FTP');
-        for(const k of ['TIME', 'NP', 'TSS', 'AVG BPM']) expect(svg).toContain(`>${k}<`);
-        expect(svg).toContain('Nov 13, 2026');
+        expect(svg).toContain('>TEST<');
         expect(svg).toMatch(/inf<tspan[^>]*>E<\/tspan><tspan[^>]*>R<\/tspan><tspan[^>]*>G<\/tspan>no<tspan[^>]*>\.com/);
-        expect(svg).not.toContain('legend');
     });
-    test('heart rate is one red line with a heart, and power has its W', () => {
+    test('no date, no FTP figure, no headline: the FTP line says only FTP', () => {
+        expect(svg).not.toMatch(/of FTP|Nov \d|5×8/);
+        expect(svg).toContain('>FTP<');
+        expect(svg).not.toContain(`>${ftp}<`);
+    });
+    test("the four numbers Strava's header does not show: NP, the main set, average HR, TSS", () => {
+        for(const k of ['NP', 'MAIN SET', 'AVG HR', 'TSS']) expect(svg).toContain(`>${k}<`);
+        expect(svg).toContain('>248 W<');                    // the reps' own watts
+        expect(svg).not.toMatch(/>TIME<|>AVG POWER</);
+    });
+    test('heart rate is one red line with a heart, and power has its W; only the reps are coloured', () => {
         expect(svg.match(/stroke="#ec1f45"/g)).toHaveLength(1);
-        expect(svg).toContain('fill="#ec1f45"/>');           // the heart
+        expect(svg).toContain('fill="#ec1f45"/>');
         expect(svg).toMatch(/>W<\/text>/);
+        expect(svg.match(/fill="#ffa877"/g)).toHaveLength(5);
     });
-    test('escapes the title, and draws a ride with no heart rate and no plan', () => {
-        const m = ride([block(0, 600, 0.6)]);
-        m.title = 'Tom & Jerry <3';
-        m.pts = m.pts.map(([t, w]) => [t, w, 0]);
-        m.blocks = [];
-        const s = posterSvg(m, {fonts: ''});
-        expect(s).toContain('TOM &amp; JERRY &lt;3');
-        expect(s).not.toContain('stroke="#ec1f45"');
-        expect(s).toContain('>10<');                          // ten minutes
+    test('no main set: kJ, and the work is coloured; no heart rate: the time', () => {
+        const z2 = ride([block(0, 600, 0.55), block(600, 3000, 0.7), block(3600, 300, 0.5)]);
+        z2.pts = z2.pts.map(([t, w]) => [t, w, 0]);
+        z2.stats = z2.stats.map(([v, k]) => [k === 'avg bpm' ? '—' : v, k]);   // as cardModel says it
+        const s2 = posterSvg(z2, {fonts: ''});
+        expect(s2).toContain('>KJ<');
+        expect(s2).toContain('>TIME<');
+        expect(s2).not.toContain('stroke="#ec1f45"');
+        expect(s2.match(/fill="#ffa877"/g)).toHaveLength(1);
+    });
+    test('escapes the name, and a long one is cut', () => {
+        const t = ride([block(0, 600, 0.6)]);
+        t.title = 'Tom & Jerry <3';
+        expect(posterSvg(t, {fonts: ''})).toContain('TOM &amp; JERRY &lt;3');
+        t.title = 'x'.repeat(80);
+        expect(posterSvg(t, {fonts: ''})).toContain(`${'X'.repeat(43)}…`);
     });
 });
