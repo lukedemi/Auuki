@@ -43,6 +43,15 @@ const defaults = {
     calmDeltaPct: 2,      // % of the target a correction must be worth when calm
     slowLane:     3,      // a smaller one (still >= resendDelta) waits this many
                           // times as long, so a small gap is closed eventually
+
+    // Starting cold (rider, Nov 26, 2026: "when I start a workout with the
+    // sloped power, like the warm-up ... it really bounces around a lot at the
+    // start"): pedalling off from a stop, the flywheel takes power the trainer
+    // has not counted yet, so the two meters disagree for reasons that have
+    // nothing to do with calibration. That much is not learned from; and the
+    // ratio from the last ride with the same meter and trainer stands in until
+    // this ride has its own.
+    spinUp:       10,     // s after pedalling off that teach nothing
 };
 
 const lerp = (a, b, k) => a + (b - a) * k;
@@ -78,6 +87,9 @@ function PowerMatchCore(args = {}) {
     let emaMeter;
     let lastT;
     let paired = 0;       // seconds of paired samples
+    let seedRatio;        // the last ride's ratio, until this one has its own
+    let stopped = true;   // not pedalling (or not yet): the next start is a spin-up
+    let learnFrom = 0;    // ms: no learning before this (the spin-up)
 
     function reset() {
         trainer    = undefined;
@@ -85,6 +97,20 @@ function PowerMatchCore(args = {}) {
         emaMeter   = undefined;
         lastT      = undefined;
         paired     = 0;
+        stopped    = true;
+    }
+
+    // every meter sample, held or not: when the rider pedals off from a stop,
+    // the next spinUp seconds teach nothing (timed from the pedalling, so it
+    // runs alongside a new interval's hold rather than after it)
+    function observe(power, t) {
+        if(!(power >= c.minPower)) { stopped = true; return; }
+        if(stopped) { stopped = false; learnFrom = t + c.spinUp * 1000; }
+    }
+
+    // the ratio to start from (a remembered one), clamped like any other
+    function seed(r) {
+        seedRatio = Number.isFinite(r) && r > 0 ? Math.min(Math.max(r, c.minRatio), c.maxRatio) : undefined;
     }
 
     function onTrainer(power, t) {
@@ -96,15 +122,23 @@ function PowerMatchCore(args = {}) {
     function onMeter(power, t, tau = c.tau) {
         if(!exists(trainer)) return;
         if((t - trainer.t) > c.maxAge) return;
+        observe(power, t);
         if(power < c.minPower || trainer.power < c.minPower) {
+            lastT = undefined;
+            return;
+        }
+        // the spin-up teaches nothing
+        if(t < learnFrom) {
             lastT = undefined;
             return;
         }
 
         if(!exists(emaMeter)) {
-            emaMeter   = power;
+            // with a remembered ratio, start from it, ready at once; the
+            // averages then follow this ride's own readings
             emaTrainer = trainer.power;
-            paired     = 0;
+            emaMeter   = exists(seedRatio) ? trainer.power * seedRatio : power;
+            paired     = exists(seedRatio) ? c.warmup : 0;
             lastT      = t;
             return;
         }
@@ -123,9 +157,9 @@ function PowerMatchCore(args = {}) {
         return exists(emaMeter) && paired >= c.warmup;
     }
 
-    // meter / trainer, 1 until there is enough data
+    // meter / trainer: the remembered one, or 1, until there is enough data
     function ratio() {
-        if(!isReady()) return 1;
+        if(!isReady()) return exists(seedRatio) ? seedRatio : 1;
         const r = emaMeter / emaTrainer;
         return Math.min(Math.max(r, c.minRatio), c.maxRatio);
     }
@@ -150,6 +184,7 @@ function PowerMatchCore(args = {}) {
             paired,
             ready: isReady(),
             ratio: ratio(),
+            seed: seedRatio,
         };
     }
 
@@ -162,6 +197,8 @@ function PowerMatchCore(args = {}) {
         ratio,
         adjust,
         reset,
+        seed,
+        observe,
         breakPair,
         state,
         config: c,
@@ -170,6 +207,25 @@ function PowerMatchCore(args = {}) {
 
 const meterId   = 'ble:powerMeter';
 const trainerId = 'ble:controllable';
+
+// The ratio each meter and trainer pair settled on, by their Bluetooth names,
+// kept in this browser so the next ride with the same pair starts from it.
+const MEMORY_KEY = 'power-match:ratios';
+export function RatioMemory(storage = (() => { try { return globalThis.localStorage; } catch(e) { return undefined; } })()) {
+    const read = () => { try { return JSON.parse(storage?.getItem(MEMORY_KEY) ?? '{}') ?? {}; } catch(e) { return {}; } };
+    return {
+        get(key) { const r = read()[key]?.ratio; return Number.isFinite(r) ? r : undefined; },
+        set(key, ratio, at = Date.now()) {
+            if(!key || !Number.isFinite(ratio)) return;
+            const all = read();
+            all[key] = {ratio: Math.round(ratio * 10000) / 10000, at};
+            try { storage?.setItem(MEMORY_KEY, JSON.stringify(all)); } catch(e) {}
+        },
+    };
+}
+export const pairKey = (meter, trainer) => (meter && trainer ? `${meter}|${trainer}` : null);
+const REMEMBER_AFTER = 120;   // s of paired samples before a ride's ratio is worth keeping
+const REMEMBER_EVERY = 60000; // ms between saves while riding
 
 // Wires the core to the app: reads db:powerTarget and the two power streams,
 // writes trainer:powerTarget, which is what the trainer actually receives.
@@ -188,6 +244,26 @@ const trainerId = 'ble:controllable';
 function PowerMatch(args = {}) {
     const core = PowerMatchCore(args);
     const now  = args.now ?? (() => Date.now());
+    const memory = args.memory ?? RatioMemory();
+    const names = {meter: null, trainer: null};
+    let rememberedAt = 0;
+    const key = () => pairKey(names.meter, names.trainer);
+    // both devices named: start from what this pair settled on last time
+    function onName(which) {
+        return function(name) {
+            names[which] = name && name !== '--' ? name : null;
+            const k = key();
+            if(k && !core.isReady()) { core.seed(memory.get(k)); record('seed'); }
+        };
+    }
+    function remember(force = false) {
+        const k = key();
+        const st = core.state();
+        if(!k || !st.ready || st.paired < REMEMBER_AFTER) return;
+        if(!force && now() - rememberedAt < REMEMBER_EVERY) return;
+        rememberedAt = now();
+        memory.set(k, st.emaMeter / st.emaTrainer, now());
+    }
     const maxRows = args.maxRows ?? 8 * 3600 * 2;
 
     let sources  = {};
@@ -352,7 +428,10 @@ function PowerMatch(args = {}) {
 
     function onPowerTarget(value) {
         const was = target;
-        if(value !== was) targetSince = now();
+        // a new interval resets the settling; a ramp's small steps (or a +5)
+        // do not, so a sloped warm-up is not chased as if every 10 s were a
+        // new interval: each step still goes out at the ratio already learned
+        if(value !== was && Math.abs(value - was) >= STEP_MIN_W) targetSince = now();
         target = value;
         if(Math.abs(value - was) >= STEP_MIN_W) {
             holdUntil = now() + STEP_HOLD_MS;
@@ -371,6 +450,7 @@ function PowerMatch(args = {}) {
 
     function onMeterPower(power) {
         meterPower = power;
+        core.observe(power, now());
         const c = calm();
         if(isHolding()) {
             status();
@@ -378,6 +458,7 @@ function PowerMatch(args = {}) {
             return;
         }
         core.onMeter(power, now(), c.tau);
+        remember();
 
         if(enabled && target > 0 && core.isReady() && !isEasing()) {
             const value = core.adjust(target);
@@ -493,6 +574,9 @@ function PowerMatch(args = {}) {
         xf.sub(`${meterId}:disconnected`,     onDisconnect('meter:disconnect'), signal);
         xf.sub(`${trainerId}:disconnected`,   onDisconnect('trainer:disconnect'), signal);
         xf.sub('db:watchStatus',              onWatchStatus, signal);
+        xf.sub(`${meterId}:name`,             onName('meter'), signal);
+        xf.sub(`${trainerId}:name`,           onName('trainer'), signal);
+        xf.sub('watch:stopped',               () => remember(true), signal);
     }
 
     function stop() {

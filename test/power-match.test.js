@@ -290,6 +290,9 @@ describe('PowerMatch settling, wired', () => {
     // drift to 5% low for five minutes: the corrections sent in the drift
     function drift(before) {
         xf.dispatch('db:sources', {sources: {power: 'ble:powerMeter'}});
+        // already riding: the spin-up from a stop (which teaches nothing) is behind us
+        xf.dispatch('db:powerTarget', {powerTarget: 200});
+        tick(30, 200, 196);
         xf.dispatch('db:powerTarget', {powerTarget: 286});
         tick(before, 286, 280);
         const from = sent.length, t0 = clock;
@@ -454,5 +457,81 @@ describe('a new interval: the calibration holds, a step up ramps in', () => {
         ride(60, 250, 250);
         xf.dispatch('db:powerTarget', {powerTarget: 255});
         expect(pm.snapshot().hold).toBe(false);
+    });
+});
+
+describe('a sloped warm-up, and starting from what the last ride learned', () => {
+    let pm, clock, sent, abort, store;
+    const memory = () => { const m = new Map(); return {get: (k) => m.get(k), set: (k, r) => m.set(k, r), m}; };
+
+    beforeEach(() => {
+        clock = 0; sent = []; abort = new AbortController();
+        store = memory();
+        pm = PowerMatch({now: () => clock, memory: store});
+        pm.start();
+        xf.sub('trainer:powerTarget', v => sent.push([clock, v]), {signal: abort.signal});
+        xf.dispatch('db:sources', {sources: {power: 'ble:powerMeter'}});
+    });
+    afterEach(() => { pm.stop(); abort.abort(); });
+
+    function tick(seconds, trainer, meter) {
+        for(let i = 0; i < seconds; i++) {
+            clock += 1000;
+            xf.dispatch('ble:controllable:power', typeof trainer === 'function' ? trainer() : trainer);
+            xf.dispatch('ble:powerMeter:power', typeof meter === 'function' ? meter() : meter);
+        }
+    }
+
+    test('a ramp\'s small steps do not restart the settling', () => {
+        xf.dispatch('db:powerTarget', {powerTarget: 155});
+        tick(90, 155, 150);
+        const steadyBefore = pm.snapshot().steady;
+        // a ramp: +3 W every 10 s for two minutes
+        for(let i = 1; i <= 12; i++) { xf.dispatch('db:powerTarget', {powerTarget: 155 + 3 * i}); tick(10, 155 + 3 * i, (155 + 3 * i) * 0.97); }
+        expect(pm.snapshot().steady).toBeGreaterThanOrEqual(steadyBefore + 120);   // still one interval
+        expect(pm.snapshot().hold).toBe(false);
+        // a real step is a new interval
+        xf.dispatch('db:powerTarget', {powerTarget: 250});
+        expect(pm.snapshot().steady).toBe(0);
+    });
+
+    test('pedalling off from a stop: the first 10 s teach nothing', () => {
+        xf.dispatch('db:powerTarget', {powerTarget: 200});
+        // the flywheel's spin-up: the meter reads far above the trainer for a few seconds
+        tick(9, 120, 190);
+        expect(pm.core.state().emaMeter).toBeUndefined();
+        tick(30, 200, 196);
+        expect(pm.core.ratio()).toBeCloseTo(0.98, 2);                       // learned from the riding, not the spin-up
+    });
+
+    test('the same meter and trainer: the next ride starts from the last one\'s ratio', () => {
+        xf.dispatch('ble:powerMeter:name', 'AssiomaPRO17220L');
+        xf.dispatch('ble:controllable:name', 'Zwift Hub');
+        xf.dispatch('db:powerTarget', {powerTarget: 220});
+        tick(200, 220, 220 * 0.95);                                          // a ride long enough to be worth keeping
+        xf.dispatch('watch:stopped');
+        const kept = store.m.get('AssiomaPRO17220L|Zwift Hub');
+        expect(kept).toBeCloseTo(0.95, 2);
+
+        // a new ride: a fresh Power Match, the same pair named
+        pm.stop(); abort.abort();
+        abort = new AbortController(); sent = [];
+        pm = PowerMatch({now: () => clock, memory: store});
+        pm.start();
+        xf.sub('trainer:powerTarget', v => sent.push([clock, v]), {signal: abort.signal});
+        xf.dispatch('db:sources', {sources: {power: 'ble:powerMeter'}});
+        xf.dispatch('ble:powerMeter:name', 'AssiomaPRO17220L');
+        xf.dispatch('ble:controllable:name', 'Zwift Hub');
+        xf.dispatch('db:powerTarget', {powerTarget: 160});
+        // corrected from the very first target, before anything is learned
+        expect(sent[sent.length - 1][1]).toBe(Math.round(160 / kept));
+        expect(pm.core.ratio()).toBeCloseTo(kept, 3);
+    });
+
+    test('a different trainer starts from 1', () => {
+        store.set('AssiomaPRO17220L|Zwift Hub', 0.9);
+        xf.dispatch('ble:powerMeter:name', 'AssiomaPRO17220L');
+        xf.dispatch('ble:controllable:name', 'KICKR');
+        expect(pm.core.ratio()).toBe(1);
     });
 });
