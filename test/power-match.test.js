@@ -380,6 +380,67 @@ describe('easing back in after a pause', () => {
         expect(sent[sent.length - 1]).toBe(80);
     });
 
+    // solo (watch.js RAMPBACK_S): the climb happens with the clock stopped,
+    // and the clock restarts at the target, so the chart has no dip
+    test('a solo ramp-back climbs while still paused, then resumes at the target with no ease', () => {
+        status('started');
+        run(25);
+        xf.dispatch('db:powerTarget', {powerTarget: 286});
+        status('paused');
+        expect(sent[sent.length - 1]).toBe(100);
+
+        sent.length = 0;
+        xf.dispatch('watch:rampback', {left: 10, total: 10});
+        expect(sent[0]).toBe(100);
+        run(5);
+        const mid = sent[sent.length - 1];
+        expect(mid).toBeGreaterThan(180);    // halfway, though the watch still says paused
+        expect(mid).toBeLessThan(205);
+        run(5);
+        expect(sent[sent.length - 1]).toBe(286);
+
+        xf.dispatch('watch:rampback', {left: 0, total: 10, done: true});
+        sent.length = 0;
+        status('started');
+        expect(sent).toEqual([286]);         // straight at the target, no second ease
+        expect(pm.isEasing()).toBe(false);
+        run(3);
+        expect(sent.every(w => w === 286)).toBe(true);
+    });
+
+    test('skipped half way: the clock restarts and the trainer goes straight to the target', () => {
+        status('started');
+        run(25);
+        xf.dispatch('db:powerTarget', {powerTarget: 250});
+        status('paused');
+        xf.dispatch('watch:rampback', {left: 10, total: 10});
+        run(3);
+        xf.dispatch('watch:rampback', {left: 0, total: 10, done: true});
+        sent.length = 0;
+        status('started');
+        expect(sent[0]).toBe(250);
+        expect(pm.isEasing()).toBe(false);
+    });
+
+    test('paused again during the ramp-back: back to the easy load, and the next resume eases', () => {
+        status('started');
+        run(25);
+        xf.dispatch('db:powerTarget', {powerTarget: 280});
+        status('paused');
+        xf.dispatch('watch:rampback', {left: 10, total: 10});
+        run(6);
+        expect(sent[sent.length - 1]).toBeGreaterThan(200);
+        xf.dispatch('watch:rampback', null);
+        expect(sent[sent.length - 1]).toBe(100);
+        run(3);
+        expect(sent[sent.length - 1]).toBe(100);
+        // a group ride (no ramp-back) resumes straight into the 20 s ease
+        sent.length = 0;
+        status('started');
+        expect(sent[0]).toBe(100);
+        expect(pm.isEasing()).toBe(true);
+    });
+
     test('a ride starting from stopped also ramps in', () => {
         xf.dispatch('db:powerTarget', {powerTarget: 250});
         sent.length = 0;

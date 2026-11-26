@@ -13,6 +13,17 @@ const timer = new Worker(new URL('./timer.js', import.meta.url));
 const AUTO_PAUSE_W = 20;   // under this is stopped
 const AUTO_PAUSE_S = 3;    // for this many seconds
 
+// Back from a pause, solo (rider, Nov 26, 2026: "by default, it's 10 seconds of
+// time to get you back, but it doesn't count towards your actual workout. And
+// it shows it very clearly on screen. Ramping back to X watts, and it has a
+// countdown. And then it plops you right back into the workout at your
+// correct watts, so you don't have a visual gash on your workout"). Resuming
+// a paused workout first runs this many seconds with the clock still stopped
+// while the trainer ramps up (power-match.js), then the clock restarts at the
+// interval's own watts; nothing is recorded meanwhile, so the ride has no dip.
+// Solo only: a group ride's clock is everyone's (doc/solo-and-group.md).
+export const RAMPBACK_S = 10;
+
 class Watch {
     constructor(args) {
         this.elapsed          = 0;
@@ -43,6 +54,7 @@ class Watch {
         // a group ride (group/group.js) moves the workout by the group's
         // clock; the watch only records
         this.groupMode         = false;
+        this.rampback          = null;     // {left} while a solo resume ramps back
         this.init();
     }
     init() {
@@ -103,6 +115,7 @@ class Watch {
         xf.sub('workout:restore', e => { self.restoreWorkout(); });
         xf.sub('ui:watchPause',   e => { self.pause();          });
         xf.sub('ui:watchResume',  e => { self.resume();         });
+        xf.sub('ui:rampback-skip', e => { self.finishRampback(); });
         xf.sub('ui:watchLap',     e => { self.lap();            });
         xf.sub('ui:watchBack',    e => { self.back();           });
         xf.sub('ui:watchJump',    i => { self.jump(i);          });
@@ -159,7 +172,7 @@ class Watch {
             // left): resume after a few seconds of it, counted down on the
             // pause banner (this fork, Nov 13, 2026, rider: "you can sit there
             // grinding for way too long"). Auto-pauses still resume at once.
-            if(this.isPaused() && !this.hasBeenAutoPaused) {
+            if(this.isPaused() && !this.hasBeenAutoPaused && !this.rampback) {
                 if(this.isPedallingThroughPause(power)) {
                     this.pausedPedalling = (this.pausedPedalling ?? 0) + 1;
                     const left = RESUME_AFTER_S - this.pausedPedalling;
@@ -197,8 +210,45 @@ class Watch {
             }
         }
     }
+    // a paused workout, solo: ramp back with the clock stopped first
+    shouldRampBack() {
+        return this.isPaused() && this.isWorkoutStarted() && !this.groupMode && RAMPBACK_S > 0;
+    }
+    startRampback() {
+        const self = this;
+        if(self.rampback) return;          // already on its way back
+        self.rampback = {left: RAMPBACK_S};
+        self.pausedPedalling = 0;
+        xf.dispatch('watch:resume-countdown', null);
+        xf.dispatch('watch:rampback', {left: RAMPBACK_S, total: RAMPBACK_S});
+        self.rampbackTimer = setInterval(() => {
+            if(!self.rampback) return;
+            self.rampback.left -= 1;
+            if(self.rampback.left <= 0) self.finishRampback();
+            else xf.dispatch('watch:rampback', {left: self.rampback.left, total: RAMPBACK_S});
+        }, 1000);
+    }
+    finishRampback() {
+        const self = this;
+        if(!self.rampback) return;
+        clearInterval(self.rampbackTimer);
+        self.rampback = null;
+        xf.dispatch('watch:rampback', {left: 0, total: RAMPBACK_S, done: true});
+        self.resumeNow();
+    }
+    cancelRampback() {
+        const self = this;
+        if(!self.rampback) return false;
+        clearInterval(self.rampbackTimer);
+        self.rampback = null;
+        xf.dispatch('watch:rampback', null);
+        return true;
+    }
     start() {
         const self = this;
+        // ▶ or Space again while ramping back: skip the rest of it
+        if(self.rampback) return self.finishRampback();
+        if(self.shouldRampBack()) return self.startRampback();
         if(self.isStarted() && !self.isWorkoutStarted()) {
             self.pause();
         } else {
@@ -268,6 +318,11 @@ class Watch {
     }
     resume() {
         const self = this;
+        if(self.shouldRampBack()) return self.startRampback();
+        self.resumeNow();
+    }
+    resumeNow() {
+        const self = this;
         if(!self.isStarted()) {
             timer.postMessage('start');
             xf.dispatch('watch:started');
@@ -282,6 +337,8 @@ class Watch {
     }
     pause() {
         const self = this;
+        // pausing again while ramping back: stay paused, the ramp is off
+        if(self.cancelRampback()) return;
         timer.postMessage('pause');
         xf.dispatch('watch:paused');
 
@@ -292,6 +349,7 @@ class Watch {
     }
     stop() {
         const self = this;
+        self.cancelRampback();
         if(self.isStarted() || self.isPaused()) {
             timer.postMessage('stop');
             // spinning on after the end never starts a new ride over the end screen

@@ -293,6 +293,12 @@ function PowerMatch(args = {}) {
     let watchState = 'stopped';
     let ramp = null;                              // {from, start, ms}
     let rampTimer;
+    // Solo, a resume first ramps back with the clock still stopped
+    // (watch.js RAMPBACK_S): the trainer climbs from the easy load to the
+    // target while paused, and the clock restarts at the target, so no ease
+    // follows. A group ride resumes at once and eases over EASE_MS as before.
+    let rampingBack = false;
+    let rampedBack = false;
 
     // Interval changes (this fork, Nov 13, 2026, rider: "when I start a new
     // interval ... Power Match has a lot of trouble ... I have to really
@@ -311,7 +317,7 @@ function PowerMatch(args = {}) {
 
     function eased(value) {
         if(!(value > 0)) return value;
-        if(watchState === 'paused') return Math.min(value, EASE_FLOOR);
+        if(watchState === 'paused' && !rampingBack) return Math.min(value, EASE_FLOOR);
         if(ramp) {
             const k = (now() - ramp.start) / ramp.ms;
             if(k >= 1) { ramp = null; return value; }
@@ -343,7 +349,15 @@ function PowerMatch(args = {}) {
             send('ease:paused');
         }
         if(state === 'started' && was !== 'started') {
-            startRamp(Math.min(EASE_FLOOR, lastSent ?? EASE_FLOOR), EASE_MS, 'ease:resume');
+            if(rampedBack) {
+                // the ramp-back already brought the trainer up: the target, at once
+                rampedBack = false;
+                ramp = null;
+                clearInterval(rampTimer);
+                send('ease:rampback-done');
+            } else {
+                startRamp(Math.min(EASE_FLOOR, lastSent ?? EASE_FLOOR), EASE_MS, 'ease:resume');
+            }
         }
         if(state === 'stopped') {
             ramp = null;
@@ -442,6 +456,25 @@ function PowerMatch(args = {}) {
             return;
         }
         send('target');
+    }
+
+    function onRampback(r) {
+        if(r && !r.done) {
+            if(rampingBack) return;
+            rampingBack = true;
+            rampedBack = false;
+            startRamp(Math.min(EASE_FLOOR, lastSent ?? EASE_FLOOR), (r.total ?? 10) * 1000, 'ease:rampback');
+            return;
+        }
+        rampingBack = false;
+        if(r && r.done) {
+            rampedBack = true;
+            return;
+        }
+        // cancelled: back to the easy load
+        ramp = null;
+        clearInterval(rampTimer);
+        send('ease:paused');
     }
 
     function onTrainerPower(power) {
@@ -574,6 +607,7 @@ function PowerMatch(args = {}) {
         xf.sub(`${meterId}:disconnected`,     onDisconnect('meter:disconnect'), signal);
         xf.sub(`${trainerId}:disconnected`,   onDisconnect('trainer:disconnect'), signal);
         xf.sub('db:watchStatus',              onWatchStatus, signal);
+        xf.sub('watch:rampback',              onRampback, signal);
         xf.sub(`${meterId}:name`,             onName('meter'), signal);
         xf.sub(`${trainerId}:name`,           onName('trainer'), signal);
         xf.sub('watch:stopped',               () => remember(true), signal);
