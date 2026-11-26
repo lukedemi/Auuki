@@ -180,7 +180,7 @@ class LiveChart extends HTMLElement {
             `avg <b>${st.w}</b> W${st.hr ? ` · <b>${st.hr}</b> bpm` : ''}${st.bal !== null ? ` · L/R <b>${st.bal}/${100 - st.bal}</b>` : ''}`;
 
         if(rows.length < 2) {
-            this.$svg.innerHTML = `<text class="lc--empty" x="${W / 2}" y="${H / 2}" text-anchor="middle">Draws while the timer runs</text>`;
+            this.$svg.innerHTML = `<text class="lc--empty" x="${W / 2}" y="${H / 2 + 34}" text-anchor="middle">Draws while the timer runs</text>`;
             return;
         }
 
