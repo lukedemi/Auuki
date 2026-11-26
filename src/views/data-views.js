@@ -824,7 +824,7 @@ class IntensityControl extends HTMLElement {
         this.innerHTML = `
             <div class="target-control--label">Workout % <button type="button" class="intensity--reset" data-act="reset" hidden>reset</button></div>
             <div class="number-input">
-                <button type="button" class="number-input--dec number-input--btn btn" data-act="dec" aria-label="Workout intensity down">-</button>
+                <button type="button" class="number-input--dec number-input--btn btn" data-act="dec" aria-label="Workout intensity down">−</button>
                 <input class="number-input--value intensity--input" type="number" min="50" max="150" step="1" value="100" autocomplete="off" aria-label="Workout intensity, percent"/>
                 <button type="button" class="number-input--inc number-input--btn btn" data-act="inc" aria-label="Workout intensity up">+</button>
             </div>`;

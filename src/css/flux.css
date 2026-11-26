@@ -4354,3 +4354,231 @@ and (orientation: landscape) {
     #view--workouts-workouts.active { height: calc(100vh - 58px); overflow-y: auto; }
     body:has(#workouts-page.active) .fixed-bottom { display: none; }
 }
+
+/*
+ * The bottom bar on desktop, one piece (rider, Nov 26, 2026: "this bottom
+ * bar can be a bit cramped and not very cohesive looking"). It was five
+ * columns of fixed pixel widths with the device switches and the targets
+ * laid over two of them, each in its own style: shouty uppercase labels,
+ * red dots for "not connected", white number boxes, and three nav buttons
+ * spread across half the screen. Now three groups, with the free room
+ * between the first and the second:
+ *   the workout and its devices · Target W, Workout % and the watch · the menu
+ * in the home page's style (its device chips, its green Ride). The device
+ * switches and the targets still live outside .fixed-bottom in the DOM, so
+ * they are fixed into their places (the switches from the left, the targets
+ * from the right). Sizes in px: this app's root font size is not 16px.
+ */
+@media only screen
+and (min-width: 1200px)
+and (min-height: 650px)
+and (orientation: landscape) {
+    :root {
+        --fb-h: 76px;
+        --fb-name-w: 300px;
+        --fb-switches-w: 370px;
+        --fb-targets-w: 400px;
+        --fb-watch-w: 176px;
+        --fb-menu-w: 264px;
+        --fb-chip: rgba(255, 255, 255, 0.07);
+        --fb-line: rgba(255, 255, 255, 0.09);
+    }
+    .fixed-bottom {
+        grid-template-columns: var(--fb-name-w) var(--fb-switches-w) minmax(0, 1fr) var(--fb-targets-w) var(--fb-watch-w) var(--fb-menu-w);
+        border-top: 1px solid var(--fb-line);
+        font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    /* the workout: a caption and its name, as written */
+    #workout-name {
+        grid-area: 1 / 1 / 2 / 2;
+        margin: 0 18px;
+        font: 700 16px/1.2 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        letter-spacing: 0;
+        text-transform: none;
+        white-space: nowrap;
+    }
+    #workout-name::before {
+        content: 'Workout';
+        display: block;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--foreground-color-inactive);
+        opacity: 0.8;
+        margin-bottom: 3px;
+    }
+
+    /* the devices: the home page's chips */
+    #home-page .page-header {
+        left: var(--fb-name-w);
+        right: auto;
+        width: var(--fb-switches-w);
+        height: var(--fb-h);
+        justify-content: flex-start;
+        gap: 8px;
+        padding: 0 14px 0 0;
+        box-sizing: border-box;
+    }
+    #home-page .page-header .connection-switch {
+        height: 32px;
+        padding: 0 12px;
+        border-radius: 999px;
+        background: var(--fb-chip);
+        gap: 8px;
+    }
+    #home-page .page-header .connection-switch:hover { background: rgba(255, 255, 255, 0.12); }
+    #home-page .page-header .connection-switch--indicator {
+        width: 8px;
+        height: 8px;
+        margin: 0;
+    }
+    #home-page .page-header .connection-switch--indicator.off { background-color: #6b7280; }
+    #home-page .page-header .connection-switch--indicator.on { background-color: #3fd08a; }
+    #home-page .page-header .connection-switch--indicator.loading { background-color: #f2c94c; }
+    #home-page .page-header .connection-switch--label {
+        font-size: 13px;
+        line-height: 1;
+        letter-spacing: 0;
+        text-transform: none;
+        white-space: nowrap;
+    }
+
+    /* the targets: two quiet steppers */
+    html.erg-only #targets {
+        left: auto;
+        right: calc(var(--fb-menu-w) + var(--fb-watch-w));
+        width: var(--fb-targets-w);
+        height: var(--fb-h);
+        padding: 0 6px 0 16px;
+        box-sizing: border-box;
+        border-left: 1px solid var(--fb-line);
+        --number-input-height: 36px;
+        --number-input-line-height: 36px;
+        --number-input-value-font-size: 18px;
+        --number-input-font-size: 18px;
+    }
+    html.erg-only #targets erg-mode-controls,
+    html.erg-only #targets #erg-mode-controls.tab.active {
+        display: flex;
+        gap: 12px;
+    }
+    html.erg-only #targets power-target-control,
+    html.erg-only #targets intensity-control {
+        flex: 1 1 0;
+        min-width: 0;
+        margin: 0;
+    }
+    html.erg-only #targets .target-control--label {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--foreground-color-inactive);
+        margin: 0 0 4px 2px;
+        text-align: left;
+    }
+    html.erg-only #targets .number-input {
+        display: flex;
+        width: 100%;
+        border-radius: 10px;
+        overflow: hidden;
+        background: var(--fb-chip);
+    }
+    html.erg-only #targets .number-input--btn {
+        flex: 0 0 38px;
+        width: 38px;
+        background: transparent;
+        color: var(--foreground-color);
+        border: 0;
+        border-radius: 0;
+        opacity: 0.75;
+        cursor: pointer;
+    }
+    html.erg-only #targets .number-input--btn:hover { opacity: 1; background: rgba(255, 255, 255, 0.08); }
+    html.erg-only #targets .number-input--value {
+        flex: 1 1 auto;
+        width: auto;
+        min-width: 0;
+        background: transparent;
+        color: var(--foreground-color);
+        border: 0;
+        border-left: 1px solid var(--fb-line);
+        border-right: 1px solid var(--fb-line);
+        border-radius: 0;
+        text-align: center;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+        -moz-appearance: textfield;
+    }
+    html.erg-only #targets .number-input--value::-webkit-inner-spin-button,
+    html.erg-only #targets .number-input--value::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    html.erg-only #targets intensity-control.changed .number-input--value { color: #f2c94c; }
+
+    /* the watch: round buttons, Start in the home page's green */
+    .watch {
+        grid-area: 1 / 5 / 2 / 6;
+        justify-self: stretch;
+        text-align: center;
+        white-space: nowrap;
+    }
+    .watch .control--btn {
+        width: 46px;
+        height: 46px;
+        margin: 0 4px;
+        padding: 11px;
+        box-sizing: border-box;
+        border-radius: 50%;
+        background: var(--fb-chip);
+        vertical-align: middle;
+        cursor: pointer;
+    }
+    .watch .control--btn:hover { background: rgba(255, 255, 255, 0.13); }
+    .watch .control--btn--icon { width: 24px; height: 24px; display: block; }
+    .watch #watch-start { background: #3fd08a; }
+    .watch #watch-start .control--btn--icon { fill: #0d1a12; }
+    .watch #watch-start:hover { filter: brightness(1.08); }
+
+    /* the menu: three compact tabs at the right */
+    .menu {
+        grid-area: 1 / 6 / 2 / 7;
+        border-left: 1px solid var(--fb-line);
+        height: var(--fb-h);
+    }
+    .menu--row {
+        justify-content: flex-end;
+        gap: 4px;
+        padding: 0 10px;
+    }
+    .menu--btn {
+        flex: 0 0 76px;
+        height: 58px;
+        border-radius: 12px;
+        gap: 3px;
+    }
+    .menu--btn:hover { background: rgba(255, 255, 255, 0.06); }
+    .menu--btn.active { background: var(--fb-chip); }
+    .menu--btn--icon { width: 22px; height: 22px; }
+    .menu--btn--label { font-size: 12px; line-height: 1; letter-spacing: 0.02em; }
+}
+
+/* a narrower desktop: the same bar, tighter */
+@media only screen
+and (min-width: 1200px)
+and (max-width: 1499px)
+and (min-height: 650px)
+and (orientation: landscape) {
+    :root {
+        --fb-name-w: 170px;
+        --fb-switches-w: 300px;
+        --fb-targets-w: 320px;
+        --fb-watch-w: 160px;
+        --fb-menu-w: 224px;
+    }
+    #home-page .page-header { gap: 6px; }
+    #home-page .page-header .connection-switch { padding: 0 10px; }
+    #home-page .page-header .connection-switch--label { font-size: 12px; }
+    .menu--btn { flex-basis: 66px; }
+    .watch .control--btn { margin: 0 2px; }
+}
