@@ -90,6 +90,8 @@ class PauseOverlay extends HTMLElement {
         xf.sub('db:watchStatus', (s) => this.onStatus(s), signal);
         xf.sub('watch:resume-countdown', (n) => this.onCountdown(n), signal);
         xf.sub('watch:rampback', (r) => this.onRampback(r), signal);
+        // the end of the workout has its own popup (workout-done.js)
+        xf.sub('watch:done-prompt', (on) => { this.donePrompt = !!on; this.onStatus(this.status); }, signal);
         xf.sub('db:powerTarget', (w) => { this.target = w; this.drawRampback(); }, signal);
         this.onStatus('stopped');
     }
@@ -139,7 +141,8 @@ class PauseOverlay extends HTMLElement {
         if(this.$end) this.$end.textContent = '■ End workout';
     }
     onStatus(status) {
-        const paused = status === 'paused';
+        this.status = status;
+        const paused = status === 'paused' && !this.donePrompt;
         if(!paused) { this.disarm(); this.onRampback(null); }
         this.classList.toggle('on', paused);
         if(!paused) this.onCountdown(null);
