@@ -50,7 +50,7 @@ export function headlineOf(m) {
     const ftp = m.ftp || 0;
     // the candidates: the reps the card model found, or (when it found none:
     // 30/15s, 1-min VO2) every hard block
-    let cands = (m.labels ?? []).map((r) => ({s0: r.s0, s1: r.s1, target: r.target}));
+    let cands = (m.labels ?? []).map((r) => ({s0: r.s0, s1: r.s1, target: r.target, w: r.w}));
     if(!cands.length && ftp) cands = (m.blocks ?? []).filter((b) => b.lo === b.hi && b.lo >= 0.85 * ftp && b.s1 - b.s0 >= 15)
         .map((b) => ({s0: b.s0, s1: b.s1, target: b.lo}));
     // the main set is the rep length that carries the most time, at its
@@ -97,8 +97,14 @@ export function mergeRamps(blocks, ftp) {
     return out.map(({ramp, ...b}) => b);
 }
 
-// the main set's average power, over its reps
+// the main set's average power: the reps' own averages where the card model
+// has them (both apps label each rep with its watts), weighted by length;
+// else the samples inside them
 function mainSetWatts(m, reps) {
+    if(reps.length && reps.every((r) => r.w > 0)) {
+        const t = reps.reduce((a, r) => a + (r.s1 - r.s0), 0);
+        if(t > 0) return Math.round(reps.reduce((a, r) => a + r.w * (r.s1 - r.s0), 0) / t);
+    }
     const w = (m.pts ?? []).filter((p) => reps.some((r) => p[0] > r.s0 && p[0] <= r.s1)).map((p) => p[1] || 0);
     return w.length ? Math.round(mean(w)) : null;
 }
