@@ -475,7 +475,7 @@ describe('a new interval: the calibration holds, a step up ramps in', () => {
         }
     }
 
-    test('the spin-up mismatch after a step teaches nothing, and the step up arrives over 5 s', () => {
+    test('the spin-up mismatch after a step teaches nothing, and an unannounced step up arrives over 2 s', () => {
         xf.dispatch('db:sources', {sources: {power: 'ble:powerMeter'}});
         xf.dispatch('db:watchStatus', {watchStatus: 'started'});
         xf.dispatch('db:powerTarget', {powerTarget: 200});
@@ -492,9 +492,9 @@ describe('a new interval: the calibration holds, a step up ramps in', () => {
         ride(12, 312, 234);
         expect(pm.core.ratio()).toBeCloseTo(ratio, 6);   // held
         expect(pm.snapshot().hold).toBe(true);
-        const up = sent.slice(0, 6);
+        const up = sent.slice(0, 3);
         up.slice(1).forEach((v, i) => expect(v).toBeGreaterThan(up[i]));   // rising every second
-        expect(up[5]).toBe(goal);                    // at 300 / ratio after 5 s
+        expect(up[2]).toBe(goal);                    // at 300 / ratio after 2 s
         expect(Math.max(...sent)).toBe(goal);        // and no correction chased the mismatch
         ride(10, 312, 300);
         expect(pm.snapshot().hold).toBe(false);
@@ -594,5 +594,114 @@ describe('a sloped warm-up, and starting from what the last ride learned', () =>
         xf.dispatch('ble:powerMeter:name', 'AssiomaPRO17220L');
         xf.dispatch('ble:controllable:name', 'KICKR');
         expect(pm.core.ratio()).toBe(1);
+    });
+});
+
+// Nov 26, 2026: 30 s into a 248 W interval the average was 235. The ramp now
+// leads: with 2 s left of the step before a step up, the trainer climbs, and
+// it is at the new target as the interval starts.
+describe('the trainer leads a step up', () => {
+    let pm, clock, sent, abort;
+    // 60 s at 50%, 30 s at 120%, 15 s at 50%, 30 s at 120%
+    const workout = {intervals: [
+        {steps: [{duration: 60, power: 0.5}]},
+        {steps: [{duration: 30, power: 1.2}, {duration: 15, power: 0.5}]},
+        {steps: [{duration: 30, power: 1.2}]},
+    ]};
+
+    beforeEach(() => {
+        jest.useFakeTimers();
+        clock = 0;
+        sent = [];
+        abort = new AbortController();
+        pm = PowerMatch({now: () => clock});
+        pm.start();
+        xf.sub('trainer:powerTarget', v => sent.push(v), {signal: abort.signal});
+        xf.dispatch('db:ftp', {ftp: 250});
+        xf.dispatch('db:intensity', {intensity: 100});
+        xf.dispatch('db:workout', {workout});
+        xf.dispatch('db:intervalIndex', {intervalIndex: 0});
+        xf.dispatch('db:stepIndex', {stepIndex: 0});
+        xf.dispatch('db:watchStatus', {watchStatus: 'started'});
+        run(21);                                    // past the start's ease
+        xf.dispatch('db:powerTarget', {powerTarget: 125});
+    });
+    afterEach(() => { pm.stop(); abort.abort(); jest.useRealTimers(); });
+
+    function run(seconds) {
+        for(let i = 0; i < seconds; i++) { clock += 1000; jest.advanceTimersByTime(1000); }
+    }
+    const stepTime = (s) => xf.dispatch('db:stepTime', {stepTime: s});
+    // the watch at a boundary (watch.js dispatchStep): the new step's time,
+    // then its index, which sets its target
+    function nextStep(iv, st, duration, target) {
+        stepTime(duration);
+        xf.dispatch('db:intervalIndex', {intervalIndex: iv});
+        xf.dispatch('db:stepIndex', {stepIndex: st});
+        xf.dispatch('db:powerTarget', {powerTarget: target});
+    }
+
+    test('with 2 s left the trainer climbs, and is at the target as the interval starts', () => {
+        stepTime(3); run(1);
+        expect(sent[sent.length - 1]).toBe(125);
+        sent.length = 0;
+        stepTime(2);
+        expect(sent[0]).toBe(125);                  // the climb starts here
+        run(1);
+        stepTime(1);
+        const mid = sent[sent.length - 1];
+        expect(mid).toBeGreaterThan(180);           // halfway: 125 + 175 / 2
+        expect(mid).toBeLessThan(240);
+        run(1);
+        stepTime(0);
+        expect(sent[sent.length - 1]).toBe(300);    // there before the interval
+        const at = sent.length;
+        nextStep(1, 0, 30, 300);
+        expect(sent[sent.length - 1]).toBe(300);
+        run(5);
+        expect(sent.slice(at).every(w => w === 300)).toBe(true);   // and stays: no second ramp
+    });
+
+    test('30/15: every rep starts at its target', () => {
+        stepTime(2); run(1); stepTime(1); run(1); stepTime(0);
+        nextStep(1, 0, 30, 300);
+        run(28);
+        stepTime(2); run(1); stepTime(1); run(1); stepTime(0);
+        nextStep(1, 1, 15, 125);
+        expect(sent[sent.length - 1]).toBe(125);    // a step down lands at once
+        stepTime(3); run(1);
+        sent.length = 0;
+        stepTime(2); run(1); stepTime(1); run(1); stepTime(0);
+        expect(sent[sent.length - 1]).toBe(300);
+        nextStep(2, 0, 30, 300);
+        expect(sent[sent.length - 1]).toBe(300);
+    });
+
+    test('a step that never comes (+5 min in the last seconds): back to this step', () => {
+        stepTime(2); run(1); stepTime(1);
+        expect(sent[sent.length - 1]).toBeGreaterThan(125);
+        stepTime(301);                              // extended
+        run(2); stepTime(300); run(1); stepTime(299);
+        expect(sent[sent.length - 1]).toBe(125);
+    });
+
+    test('a skip during the lead goes to where the skip lands', () => {
+        stepTime(2); run(1);
+        xf.dispatch('db:powerTarget', {powerTarget: 140});   // not what was coming
+        run(1);
+        expect(sent[sent.length - 1]).toBe(140);
+    });
+
+    test('paused during the lead: no lead', () => {
+        stepTime(2); run(1);
+        xf.dispatch('db:watchStatus', {watchStatus: 'paused'});
+        expect(sent[sent.length - 1]).toBe(100);
+    });
+
+    test('a step up under 30 W is not led', () => {
+        xf.dispatch('db:workout', {workout: {intervals: [{steps: [{duration: 60, power: 0.5}, {duration: 60, power: 0.55}]}]}});
+        sent.length = 0;
+        stepTime(2); run(1); stepTime(1); run(1);
+        expect(sent.every(w => w === 125)).toBe(true);
     });
 });
