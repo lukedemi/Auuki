@@ -19,6 +19,7 @@
 //
 
 import { xf, exists, equals, } from './functions.js';
+import { ahead, nextChange } from './plan-ahead.js';
 
 const defaults = {
     tau:          20,     // s, time constant of the moving averages
@@ -307,13 +308,29 @@ function PowerMatch(args = {}) {
     // is spinning up, so the pedals and the trainer disagree for reasons
     // that have nothing to do with calibration. So after a change of 10 W+
     // the ratio is held: nothing learned and no corrections for 15 s, the
-    // new target sent with the ratio already known. A step up of 30 W+
-    // ramps in over 5 s instead of landing as a wall.
+    // new target sent with the ratio already known.
+    //
+    // A step up of 30 W+ ramps in rather than landing as a wall, and the
+    // ramp LEADS the interval (rider, Nov 26, 2026: "I'm about 30 seconds
+    // into an interval with a target of 248 watts, but my average power is
+    // only 235 ... this could be really troublesome for something like a
+    // 30-15"). It was a 5 s ramp starting at the interval, so the interval
+    // paid for all of it, plus the trainer's second of lag: ~100 W × 3 s
+    // gone from a 30 s rep is 10 W off its average, and on a 30/15 every rep.
+    // Now, with STEP_LEAD_S left in the step and a step up next, the trainer
+    // climbs over those seconds and reaches the new target as the interval
+    // starts. The recovery's last 2 s carry the climb instead. A change the
+    // plan did not announce (a skip, a jump) ramps over STEP_RAMP_MS from
+    // the moment it lands. Solo and group alike: it moves only the trainer.
     const STEP_MIN_W   = args.stepMinW ?? 10;
     const STEP_HOLD_MS = args.stepHoldMs ?? 15000;
     const STEP_RAMP_W  = args.stepRampW ?? 30;
-    const STEP_RAMP_MS = args.stepRampMs ?? 5000;
+    const STEP_RAMP_MS = args.stepRampMs ?? 2000;
+    const STEP_LEAD_S  = args.stepLeadS ?? 2;
     let holdUntil = 0;
+    // the plan, for the lead: what comes after the step running
+    const plan = {workout: null, iv: 0, st: 0, stepLeft: 0, ftp: 0, intensity: 100};
+    let lead = null;                              // {to, until}: climbing to the next step's target
 
     function eased(value) {
         if(!(value > 0)) return value;
@@ -344,6 +361,7 @@ function PowerMatch(args = {}) {
     function onWatchStatus(state) {
         const was = watchState;
         watchState = state;
+        if(state !== 'started') lead = null;
         if(state === 'paused' && was !== 'paused') {
             ramp = null;
             send('ease:paused');
@@ -370,7 +388,9 @@ function PowerMatch(args = {}) {
     }
 
     function trainerTarget() {
-        return eased(enabled ? core.adjust(target) : target);
+        // while leading, the goal is the next step's target
+        const goal = lead ? lead.to : target;
+        return eased(enabled ? core.adjust(goal) : goal);
     }
 
     function snapshot(event = '') {
@@ -442,6 +462,9 @@ function PowerMatch(args = {}) {
 
     function onPowerTarget(value) {
         const was = target;
+        // the step the lead was climbing to has arrived: it is already on its way
+        const led = lead && value === lead.to;
+        lead = null;
         // a new interval resets the settling; a ramp's small steps (or a +5)
         // do not, so a sloped warm-up is not chased as if every 10 s were a
         // new interval: each step still goes out at the ratio already learned
@@ -451,11 +474,41 @@ function PowerMatch(args = {}) {
             holdUntil = now() + STEP_HOLD_MS;
             core.breakPair();
         }
+        if(led) {
+            if(!ramp) send('step:led');
+            return;
+        }
         if(was > 0 && value - was >= STEP_RAMP_W && watchState === 'started' && !ramp) {
             startRamp(lastSent ?? was, STEP_RAMP_MS, 'step:ramp');
             return;
         }
+        if(ramp?.lead) ramp = null;               // the lead was for a step that never came
         send('target');
+    }
+
+    // once a second, the time left in the step: with STEP_LEAD_S left and a
+    // step up of STEP_RAMP_W+ next, start climbing to it
+    function onStepTime(left) {
+        plan.stepLeft = left;
+        if(lead) {
+            // the step it was climbing to never came (+5 min in the last
+            // seconds, a pause): back to this step's target. (Not on the step
+            // time growing: solo, the new step's time lands just before its
+            // target does.)
+            if(now() > lead.until) {
+                lead = null;
+                if(ramp?.lead) ramp = null;
+                send('lead:cancel');
+            }
+            return;
+        }
+        if(!(left > 0 && left <= STEP_LEAD_S) || watchState !== 'started' || ramp || rampingBack) return;
+        if(!(target > 0) || !(plan.ftp > 0)) return;
+        const next = nextChange(ahead({...plan, target, seconds: left + 1}));
+        if(!next || next.from !== left || !(next.w - target >= STEP_RAMP_W)) return;
+        lead = {to: next.w, until: now() + left * 1000 + 1500};
+        startRamp(lastSent ?? target, left * 1000, 'step:lead');
+        ramp.lead = true;
     }
 
     function onRampback(r) {
@@ -608,6 +661,12 @@ function PowerMatch(args = {}) {
         xf.sub(`${trainerId}:disconnected`,   onDisconnect('trainer:disconnect'), signal);
         xf.sub('db:watchStatus',              onWatchStatus, signal);
         xf.sub('watch:rampback',              onRampback, signal);
+        xf.sub('db:stepTime',                 onStepTime, signal);
+        xf.sub('db:workout',                  (w) => { plan.workout = w; }, signal);
+        xf.sub('db:intervalIndex',            (i) => { plan.iv = i; }, signal);
+        xf.sub('db:stepIndex',                (i) => { plan.st = i; }, signal);
+        xf.sub('db:ftp',                      (f) => { plan.ftp = f; }, signal);
+        xf.sub('db:intensity',                (v) => { plan.intensity = v || 100; }, signal);
         xf.sub(`${meterId}:name`,             onName('meter'), signal);
         xf.sub(`${trainerId}:name`,           onName('trainer'), signal);
         xf.sub('watch:stopped',               () => remember(true), signal);
