@@ -311,11 +311,16 @@ function LocalActivity(args = {}) {
             // data file_id
             dataRecord.toFITjs(
                 definitions.file_id,
+                // what made the file: infERGno, under FIT's "development"
+                // manufacturer, not a Garmin Edge 1030 as upstream wrote
+                // (rider, Nov 26, 2026: Strava showed his rides as "Garmin
+                // Edge 1030 Plus", "which is not good")
                 FileId({
                     time_created,
-                    manufacturer:  1,    // garmin
-                    product:       3570, // edge 1030
+                    manufacturer:  255,  // development
+                    product:       0,
                     serial_number: 3313379353,
+                    product_name:  'infERGno',
                 })
             ),
 
@@ -325,7 +330,7 @@ function LocalActivity(args = {}) {
             dataRecord.toFITjs(
                 definitions.file_creator,
                 FileCreator({
-                    software_version: 29, // edge 1030
+                    software_version: 1,
                 })
             ),
 
@@ -434,6 +439,7 @@ function FileId(args = {}) {
 	      serial_number: args.serial_number ?? 0,
         number: 0,
         type: 4,
+        product_name: args.product_name ?? '',
     };
 }
 

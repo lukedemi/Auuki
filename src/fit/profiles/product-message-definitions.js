@@ -12,6 +12,7 @@ const productMessageDefinitions = [
         'serial_number',
         'number',
         'type',
+        ['product_name', 16],
     ], 0],
     ['file_creator', [
         'software_version',

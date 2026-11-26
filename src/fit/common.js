@@ -85,11 +85,20 @@ const identityParser = ValueParser();
 function FitString() {
 
     // BaseType -> Bool
+    // the profiles give it by name ('string'), a decoded definition by number (7)
     function isString(base_type) {
-        return equals(base_type, 7);
+        return equals(base_type, 7) || equals(base_type, 'string');
     }
 
-    function encode() {
+    // {size: Int}, String, DataView, Int -> void: UTF-8, cut to fit with its
+    // terminating zero, the rest of the field zeros (it was a no-op upstream,
+    // so no string field was ever written)
+    function encode(field, value, dataview, i = 0) {
+        const bytes = new TextEncoder().encode(String(value ?? ''));
+        const n = Math.min(bytes.length, Math.max(0, field.size - 1));
+        for(let k = 0; k < field.size; k++) {
+            dataview.setUint8(i + k, k < n ? bytes[k] : 0);
+        }
     }
 
     // {size: Int}, DataView, Int, Bool, -> String

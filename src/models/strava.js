@@ -99,7 +99,7 @@ function Strava(args = {}) {
                 const res = await stravaDirect.upload(record.blob, {
                     name: record.summary?.name,
                     description: record.summary?.notes?.trim() || undefined,
-                    externalId: `ergatory-${record.id ?? record.summary?.id}`,
+                    externalId: `infergno-${record.id ?? record.summary?.id}`,
                 });
                 if(record.summary) record.summary.strava_id = res.activityId;
                 return ':success';
