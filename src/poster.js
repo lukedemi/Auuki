@@ -45,26 +45,28 @@ export function headlineOf(m) {
     if(!cands.length && ftp) cands = (m.blocks ?? []).filter((b) => b.lo === b.hi && b.lo >= 0.85 * ftp && b.s1 - b.s0 >= 15)
         .map((b) => ({s0: b.s0, s1: b.s1, target: b.lo}));
     // the main set is the rep length that carries the most time, at its
-    // hardest (so a lone 3-min opener before 5 × 8 min is not a sixth rep)
-    const roundDur = (d) => (d >= 120 ? Math.round(d / 30) * 30 : Math.round(d / 5) * 5);
-    const groups = new Map();
-    for(const c of cands) {
-        const k = roundDur(c.s1 - c.s0);
-        groups.set(k, [...(groups.get(k) ?? []), c]);
+    // hardest (so a lone 3-min opener before 5 × 8 min is not a sixth rep).
+    // Lengths within ~12% are one length: laps pressed by hand wander
+    // (Oct 8, 2026's "14-minute" reps were 12:44, 12:46 and 12:35).
+    const sorted = cands.slice().sort((a, b) => (a.s1 - a.s0) - (b.s1 - b.s0));
+    const groups = [];
+    for(const c of sorted) {
+        const g = groups[groups.length - 1];
+        if(g && (c.s1 - c.s0) <= 1.12 * (g[0].s1 - g[0].s0)) g.push(c); else groups.push([c]);
     }
+    const timeOf = (g) => g.reduce((a, c) => a + c.s1 - c.s0, 0);
     let best = null;
-    for(const [k, g] of groups) if(!best || k * g.length > best.k * best.g.length) best = {k, g};
+    for(const g of groups) if(!best || timeOf(g) > timeOf(best)) best = g;
     let reps = [];
     if(best) {
-        const top = Math.max(...best.g.map((c) => c.target));
-        reps = best.g.filter((c) => c.target >= 0.95 * top);
+        const top = Math.max(...best.map((c) => c.target));
+        reps = best.filter((c) => c.target >= 0.95 * top).sort((a, b) => a.s0 - b.s0);
     }
     if(!reps.length) return {main: String(Math.max(1, Math.round((m.end || 0) / 60))), unit: 'MIN', reps};
     const durs = reps.map((r) => r.s1 - r.s0).sort((a, b) => a - b);
     const d = durs[Math.floor(durs.length / 2)];
-    // minutes when the rep is a whole minute (laps pressed by hand land near
-    // one: round to the nearest 30 s from 2 min up), seconds below that
-    const secs = d >= 120 ? Math.round(d / 30) * 30 : Math.round(d / 5) * 5;
+    // the whole minute from 5 min up, the half minute from 2, seconds below
+    const secs = d >= 300 ? Math.round(d / 60) * 60 : d >= 120 ? Math.round(d / 30) * 30 : Math.round(d / 5) * 5;
     const len = secs % 60 === 0 ? String(secs / 60) : secs >= 120 ? String(Math.round(secs / 30) / 2) : String(secs);
     const unit = secs % 60 === 0 || secs >= 120 ? 'MIN' : 'SEC';
     return {main: reps.length > 1 ? `${reps.length}×${len}` : len, unit, reps};

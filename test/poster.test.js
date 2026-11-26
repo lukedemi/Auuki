@@ -31,6 +31,10 @@ describe('the headline: the main set', () => {
         const reps = [478, 492, 485].map((d, i) => ({s0: 600 + i * 700, s1: 600 + i * 700 + d, target: 260}));
         expect(headlineOf({ftp, end: 3600, blocks: [], labels: reps})).toMatchObject({main: '3×8', unit: 'MIN'});
     });
+    test("Oct 8, 2026: three '14-minute' laps of 12:44, 12:46 and 12:35 are one set of three", () => {
+        const reps = [764, 766, 755].map((d, i) => ({s0: 3000 + i * 1200, s1: 3000 + i * 1200 + d, target: 286}));
+        expect(headlineOf({ftp: 295, end: 9000, blocks: [], labels: reps})).toMatchObject({main: '3×13', unit: 'MIN'});
+    });
     test('one long effort is its length; no main set is the ride', () => {
         expect(headlineOf({ftp, end: 2400, blocks: [], labels: [{s0: 600, s1: 1800, target: 280}]})).toMatchObject({main: '20', unit: 'MIN'});
         expect(headlineOf(ride([block(0, 3600, 0.68)]))).toMatchObject({main: '60', unit: 'MIN'});
