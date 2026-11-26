@@ -1,0 +1,200 @@
+//
+// The ride image, as a poster (rider, Nov 26, 2026, after four rounds of
+// drafts: the Riso look — navy and fluorescent orange on paper — with the main
+// set as huge type, the reps in a soft orange, power in navy, heart rate the
+// one red line with a heart beside it and a W for power, four numbers, and
+// infERGno.com at the foot). 1200 × 1500 (4:5), so it fills a phone in the
+// Strava feed.
+//
+// posterSvg(m, {date}) takes the card model both this app (ride-card.js
+// cardModel) and lukedemi/bikes (rides/site/src/card.js cardModel) build:
+//   {title, ftp, end, step, pts: [[t, w, hr]], blocks: [{s0, s1, lo, hi}],
+//    labels: [{s0, s1, target}] (the main set's reps), stats: [[value, key]]}
+// It has no imports beyond its fonts, so the same file runs in the browser
+// and in the bikes Worker. Keep the two copies the same.
+//
+import { POSTER_FONTS } from './poster-fonts.js';
+
+export const POSTER_W = 1200, POSTER_H = 1500;
+
+const NAVY = '#24337a', ORANGE = '#ff6c2f', PAPER = '#f4efe3', RED = '#ec1f45', DIM = '#5b6496';
+const REP = '#ffa877', ENDURANCE = '#ffd2b6', EASY = '#dcdfee';
+const DISPLAY = "'InfergnoDisplay', 'Inter Display', Inter, sans-serif";
+const TEXT = "'InfergnoText', Inter, sans-serif";
+
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;'}[c]));
+const mean = (xs) => xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0;
+function smooth(values, n) {
+    const out = [];
+    let s = 0;
+    for(let i = 0; i < values.length; i++) {
+        s += values[i];
+        if(i >= n) s -= values[i - n];
+        out.push(s / Math.min(i + 1, n));
+    }
+    return out;
+}
+
+// "5×8" + "MIN": the main set, from its reps — how many, and how long the
+// usual one is. A ride with no main set is its length: "60" + "MIN".
+export function headlineOf(m) {
+    const ftp = m.ftp || 0;
+    // the candidates: the reps the card model found, or (when it found none:
+    // 30/15s, 1-min VO2) every hard block
+    let cands = (m.labels ?? []).map((r) => ({s0: r.s0, s1: r.s1, target: r.target}));
+    if(!cands.length && ftp) cands = (m.blocks ?? []).filter((b) => b.lo === b.hi && b.lo >= 0.85 * ftp && b.s1 - b.s0 >= 15)
+        .map((b) => ({s0: b.s0, s1: b.s1, target: b.lo}));
+    // the main set is the rep length that carries the most time, at its
+    // hardest (so a lone 3-min opener before 5 × 8 min is not a sixth rep)
+    const roundDur = (d) => (d >= 120 ? Math.round(d / 30) * 30 : Math.round(d / 5) * 5);
+    const groups = new Map();
+    for(const c of cands) {
+        const k = roundDur(c.s1 - c.s0);
+        groups.set(k, [...(groups.get(k) ?? []), c]);
+    }
+    let best = null;
+    for(const [k, g] of groups) if(!best || k * g.length > best.k * best.g.length) best = {k, g};
+    let reps = [];
+    if(best) {
+        const top = Math.max(...best.g.map((c) => c.target));
+        reps = best.g.filter((c) => c.target >= 0.95 * top);
+    }
+    if(!reps.length) return {main: String(Math.max(1, Math.round((m.end || 0) / 60))), unit: 'MIN', reps};
+    const durs = reps.map((r) => r.s1 - r.s0).sort((a, b) => a - b);
+    const d = durs[Math.floor(durs.length / 2)];
+    // minutes when the rep is a whole minute (laps pressed by hand land near
+    // one: round to the nearest 30 s from 2 min up), seconds below that
+    const secs = d >= 120 ? Math.round(d / 30) * 30 : Math.round(d / 5) * 5;
+    const len = secs % 60 === 0 ? String(secs / 60) : secs >= 120 ? String(Math.round(secs / 30) / 2) : String(secs);
+    const unit = secs % 60 === 0 || secs >= 120 ? 'MIN' : 'SEC';
+    return {main: reps.length > 1 ? `${reps.length}×${len}` : len, unit, reps};
+}
+
+// "at 248 W · 88% of FTP": what the reps asked for
+function sublineOf(m, reps) {
+    if(!reps.length) return '';
+    const t = Math.round(mean(reps.map((r) => r.target)));
+    return m.ftp ? `at ${t} W · ${Math.round(100 * t / m.ftp)}% of FTP` : `at ${t} W`;
+}
+
+// A ramp arrives as a stair of short steps (the app writes one every 10 s):
+// back-to-back short blocks a few watts apart, merged into one sloped block,
+// so the warm-up is drawn as a slope instead of slivers.
+export function mergeRamps(blocks, ftp) {
+    const out = [];
+    for(const b of blocks ?? []) {
+        const last = out[out.length - 1];
+        const short = (q) => q.s1 - q.s0 <= 60;
+        if(last && last.ramp !== false && last.s1 === b.s0 && short(b) && (last.ramp || short(last))
+            && Math.abs(b.lo - last.hi) <= Math.max(3, 0.05 * (ftp || 250))) {
+            last.s1 = b.s1; last.hi = b.hi; last.ramp = true;
+        } else out.push({...b, ramp: undefined});
+    }
+    return out.map(({ramp, ...b}) => b);
+}
+
+const dateOf = (ts) => {
+    const d = new Date(ts ?? Date.now());
+    return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'});
+};
+
+// a heart, centred at (cx, cy), s px wide
+const heart = (cx, cy, s) => `<path transform="translate(${(cx - s / 2).toFixed(1)},${(cy - s * 0.46).toFixed(1)}) scale(${s / 24})" d="M12 21.6C6 17.4 1.6 13.4 1.6 8.6 1.6 5.4 4 3 7 3c2 0 3.8 1.1 5 2.9C13.2 4.1 15 3 17 3c3 0 5.4 2.4 5.4 5.6 0 4.8-4.4 8.8-10.4 13z" fill="${RED}"/>`;
+
+export function posterSvg(m, {date = null, fonts = POSTER_FONTS} = {}) {
+    const W = POSTER_W, H = POSTER_H;
+    const ftp = m.ftp || 250;
+    const step = m.step || 5;
+    const end = Math.max(1, m.end || 1);
+    const pts = m.pts ?? [];
+    const head = headlineOf(m);
+    const sub = sublineOf(m, head.reps);
+    const repOf = (b) => head.reps.some((r) => (b.s0 + b.s1) / 2 > r.s0 && (b.s0 + b.s1) / 2 < r.s1);
+    const blocks = mergeRamps(m.blocks, m.ftp);
+
+    // the chart
+    const x0 = 72, y0 = 680, cw = 1010, ch = 540, base = y0 + ch;
+    const x = (t) => x0 + cw * t / end;
+    const k = Math.max(1, Math.round(15 / step));
+    const ws = smooth(pts.map((p) => p[1] || 0), k);
+    const hs = smooth(pts.map((p) => p[2] || 0), Math.max(1, Math.round(20 / step)));
+    const top = Math.max(1.1 * ftp, 1.2 * Math.max(0, ...blocks.map((b) => Math.max(b.lo, b.hi))),
+        1.05 * (ws.slice().sort((a, b) => a - b)[Math.floor(ws.length * 0.98)] ?? 0));
+    const y = (w) => base - ch * Math.min(Math.max(w, 0), top) / top;
+    // heart rate on its own scale, so its rise and fall fill the height
+    const ridden = (i) => (pts[i][1] || 0) > 30 && (pts[i][2] || 0) > 60;
+    const hrOk = hs.filter((v, i) => ridden(i));
+    // the scale from the readings themselves, not the smoothed line, so a
+    // rep's climb sits inside the chart rather than at its top
+    const hrRaw = pts.filter((p, i) => ridden(i)).map((p) => p[2]);
+    const hrLo = hrRaw.length ? Math.floor((Math.min(...hrRaw) - 4) / 10) * 10 : 80;
+    const hrHi = hrRaw.length ? Math.ceil((Math.max(...hrRaw) + 4) / 10) * 10 : 180;
+    const yh = (v) => base - ch * (Math.min(Math.max(v, hrLo), hrHi) - hrLo) / (hrHi - hrLo);
+    // both lines start at the first pedal stroke; heart rate breaks where it dropped out
+    const first = pts.findIndex((p) => (p[1] || 0) > 30);
+    const path = (vals, ok, yf) => {
+        let pen = 'M';
+        return vals.map((v, i) => {
+            if(i < first || !ok(i)) { pen = 'M'; return ''; }
+            const s = `${pen}${x(pts[i][0]).toFixed(1)},${yf(v).toFixed(1)}`;
+            pen = 'L';
+            return s;
+        }).join('');
+    };
+    const pPath = first < 0 ? '' : path(ws, () => true, y);
+    const hPath = first < 0 || !hrOk.length ? '' : path(hs, ridden, yh);
+
+    // the headline, sized to its length
+    const size = Math.min(360, Math.floor(700 / (head.main.length * 0.62)));
+    const off = Math.max(4, Math.round(size / 36));
+
+    const out = [];
+    out.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="${TEXT}">`);
+    if(fonts) out.push(`<style>${fonts}</style>`);
+    out.push(`<rect width="${W}" height="${H}" fill="${PAPER}"/>`);
+    const title = String(m.title || 'Ride').toUpperCase();
+    const long = title.length > 26;
+    out.push(`<text x="72" y="140" font-size="24" font-weight="700" letter-spacing="${long ? 3 : 7}" fill="${NAVY}">${esc(title.length > 40 ? `${title.slice(0, 39)}…` : title)}</text>`);
+    out.push(`<text x="${W - 72}" y="140" text-anchor="end" font-size="24" font-weight="400" fill="${DIM}">${esc(dateOf(date))}</text>`);
+    out.push(`<g style="mix-blend-mode:multiply" font-family="${DISPLAY}" font-weight="900" font-size="${size}" letter-spacing="${-size / 20}">
+        <text x="${58 + off}" y="${470 + off}" fill="${ORANGE}">${esc(head.main)}</text>
+        <text x="58" y="470" fill="${NAVY}" fill-opacity=".92">${esc(head.main)}</text></g>`);
+    out.push(`<text x="${W - 72}" y="470" text-anchor="end" font-family="${DISPLAY}" font-size="120" font-weight="900" letter-spacing="-4" fill="${ORANGE}">${head.unit}</text>`);
+    if(sub) out.push(`<text x="72" y="552" font-size="32" font-weight="400" fill="${NAVY}">${esc(sub)}</text>`);
+
+    // the plan: the reps soft orange, endurance and tempo peach, the rest pale navy
+    out.push(`<g style="mix-blend-mode:multiply">`);
+    for(const b of blocks) {
+        const pct = (b.lo + b.hi) / 2 / ftp;
+        const fill = repOf(b) ? REP : pct >= 0.7 ? ENDURANCE : EASY;
+        out.push(`<path d="M${x(b.s0).toFixed(1)},${base}L${x(b.s0).toFixed(1)},${y(b.lo).toFixed(1)}L${x(b.s1).toFixed(1)},${y(b.hi).toFixed(1)}L${x(b.s1).toFixed(1)},${base}Z" fill="${fill}"/>`);
+    }
+    out.push(`</g>`);
+    if(pPath) out.push(`<path d="${pPath}" fill="none" stroke="${NAVY}" stroke-width="2.4" stroke-linejoin="round"/>`);
+    if(hPath) out.push(`<path d="${hPath}" fill="none" stroke="${RED}" stroke-width="3.8" stroke-linejoin="round" stroke-linecap="round"/>`);
+
+    // the heart where heart rate ends; the W at the power the ride finished on
+    // (the last 2 minutes' median, not its drop to zero) — never on top of each other
+    const gx = x0 + cw + 30;
+    const lastHr = hs.map((v, i) => (ridden(i) ? v : null)).filter((v) => v != null).pop();
+    const tail = pts.slice(-Math.max(2, Math.round(120 / step))).map((p) => p[1] || 0).filter((v) => v > 30).sort((a, b) => a - b);
+    let wy = tail.length ? y(tail[Math.floor(tail.length / 2)]) : null;
+    const hy = lastHr != null ? yh(lastHr) : null;
+    if(wy != null && hy != null && Math.abs(wy - hy) < 36) wy = hy - 38;
+    if(hy != null) out.push(heart(gx, hy, 30));
+    if(wy != null) out.push(`<text x="${gx}" y="${(wy + 11).toFixed(1)}" text-anchor="middle" font-family="${DISPLAY}" font-size="32" font-weight="900" fill="${NAVY}">W</text>`);
+
+    // four numbers
+    const stat = (key) => (m.stats ?? []).find(([, k]) => k.toLowerCase() === key)?.[0] ?? '—';
+    const stats = [[stat('time'), 'TIME'], [stat('np'), 'NP'], [stat('tss'), 'TSS'], [stat('avg bpm'), 'AVG BPM']];
+    stats.forEach(([v, k], i) => {
+        const sx = 72 + i * 270;
+        out.push(`<text x="${sx}" y="${H - 200}" font-family="${DISPLAY}" font-size="50" font-weight="800" fill="${NAVY}">${esc(v)}</text>
+            <text x="${sx}" y="${H - 168}" font-size="18" font-weight="700" letter-spacing="2" fill="${ORANGE}">${k}</text>`);
+    });
+
+    // infERGno.com
+    out.push(`<text x="72" y="${H - 56}" font-family="${DISPLAY}" font-size="44" font-weight="800" letter-spacing="-.5" fill="${NAVY}">inf<tspan fill="${ORANGE}" font-weight="900">E</tspan><tspan fill="${ORANGE}" font-weight="900">R</tspan><tspan fill="${RED}" font-weight="900">G</tspan>no<tspan fill="${DIM}">.com</tspan></text>`);
+    out.push('</svg>');
+    return out.join('\n');
+}
