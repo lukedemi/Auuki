@@ -382,11 +382,15 @@ export function cardSvg(m) {
 // SVG -> PNG through a canvas
 export async function svgToPng(svg) {
     const url = URL.createObjectURL(new Blob([svg], {type: 'image/svg+xml'}));
+    // the image's own size (the poster is 1200 x 1500, the old card 1600 x 1000)
+    const size = (k, d) => Number(String(svg).match(new RegExp(`<svg[^>]*\\s${k}="(\\d+)"`))?.[1]) || d;
     try {
         const im = new Image();
         await new Promise((ok, no) => { im.onload = ok; im.onerror = () => no(new Error('the image would not draw')); im.src = url; });
+        // the embedded fonts finish loading after the image does
+        await new Promise((ok) => setTimeout(ok, 50));
         const c = document.createElement('canvas');
-        c.width = W; c.height = H;
+        c.width = size('width', W); c.height = size('height', H);
         c.getContext('2d').drawImage(im, 0, 0);
         return await new Promise((ok) => c.toBlob(ok, 'image/png'));
     } finally {
