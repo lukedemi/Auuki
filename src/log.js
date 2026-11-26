@@ -172,6 +172,8 @@ function start(log) {
     xf.sub('rider:restored', (r) => e('settings:restored', r));
     xf.sub('ramp-test:result', (r) => e('ramp-test:result', r));
     xf.sub('ui:ftp-set', (f) => e('ftp:set', {ftp: f}));
+    xf.sub('watch:done-prompt', (on) => { if(on) e('workout:done', {workout, elapsed}); });
+    xf.sub('ui:keep-riding', () => e('workout:keep-riding', {workout}));
     let rescuing = false;
     xf.sub('powerMatch:rescue', (r) => {
         if(r?.on && !rescuing) e('spiral:rescue', {cadence: Math.round(r.cadence ?? 0), target: Math.round(r.target ?? 0), workout});

@@ -55,6 +55,7 @@ class Watch {
         // clock; the watch only records
         this.groupMode         = false;
         this.rampback          = null;     // {left} while a solo resume ramps back
+        this.donePrompt        = false;    // the workout ended: paused, asking finish or ride on
         this.init();
     }
     init() {
@@ -88,6 +89,8 @@ class Watch {
                 if(!self.groupMode) {
                     xf.dispatch('ui:slope-target-set', 0);
                     xf.dispatch('ui:mode-set', ControlMode.sim);
+                    // solo, the clock stops with the workout and asks
+                    if(self.isStarted()) self.finishPrompt();
                 }
                 console.log(`Workout done!`);
             }
@@ -115,6 +118,7 @@ class Watch {
         xf.sub('workout:restore', e => { self.restoreWorkout(); });
         xf.sub('ui:watchPause',   e => { self.pause();          });
         xf.sub('ui:watchResume',  e => { self.resume();         });
+        xf.sub('ui:keep-riding',  e => { self.keepRiding();     });
         xf.sub('ui:rampback-skip', e => { self.finishRampback(); });
         xf.sub('ui:watchLap',     e => { self.lap();            });
         xf.sub('ui:watchBack',    e => { self.back();           });
@@ -172,7 +176,7 @@ class Watch {
             // left): resume after a few seconds of it, counted down on the
             // pause banner (this fork, Nov 13, 2026, rider: "you can sit there
             // grinding for way too long"). Auto-pauses still resume at once.
-            if(this.isPaused() && !this.hasBeenAutoPaused && !this.rampback) {
+            if(this.isPaused() && !this.hasBeenAutoPaused && !this.rampback && !this.donePrompt) {
                 if(this.isPedallingThroughPause(power)) {
                     this.pausedPedalling = (this.pausedPedalling ?? 0) + 1;
                     const left = RESUME_AFTER_S - this.pausedPedalling;
@@ -244,8 +248,34 @@ class Watch {
         xf.dispatch('watch:rampback', null);
         return true;
     }
+    // The end of a solo workout (rider, Nov 26, 2026: "just finished the
+    // workout and it continued to run like as if I wanted to keep going. But
+    // that should never be the case. When I'm done the workout, it should say,
+    // congratulations, and pop up. You should be able to click, no, I want to
+    // do more"). The clock stops on the last second of the last step, so the
+    // ride's time is the workout's; views/workout-done.js asks: Finish & save
+    // (ui:watchEnd, the ride saved and the end screen opened) or Keep riding
+    // (the clock on again, a free ride in SIM). Pedalling while it asks does
+    // not resume anything. A group ride goes on into the group's cool-down.
+    finishPrompt() {
+        const self = this;
+        if(self.donePrompt) return;
+        self.donePrompt = true;
+        self.pausedPedalling = 0;
+        self.pause();
+        xf.dispatch('watch:done-prompt', true);
+    }
+    keepRiding() {
+        const self = this;
+        if(!self.donePrompt) return;
+        self.donePrompt = false;
+        xf.dispatch('watch:done-prompt', false);
+        self.resumeNow();
+    }
     start() {
         const self = this;
+        // ▶ or Space while the end of the workout asks: keep riding
+        if(self.donePrompt) return self.keepRiding();
         // ▶ or Space again while ramping back: skip the rest of it
         if(self.rampback) return self.finishRampback();
         if(self.shouldRampBack()) return self.startRampback();
@@ -318,6 +348,7 @@ class Watch {
     }
     resume() {
         const self = this;
+        if(self.donePrompt) return;             // only Keep riding resumes after the end
         if(self.shouldRampBack()) return self.startRampback();
         self.resumeNow();
     }
@@ -350,6 +381,7 @@ class Watch {
     stop() {
         const self = this;
         self.cancelRampback();
+        if(self.donePrompt) { self.donePrompt = false; xf.dispatch('watch:done-prompt', false); }
         if(self.isStarted() || self.isPaused()) {
             timer.postMessage('stop');
             // spinning on after the end never starts a new ride over the end screen

@@ -17,6 +17,7 @@ import './time-left.js';
 import './fit-text.js';
 import './pause-overlay.js';
 import './spiral-rescue.js';
+import './workout-done.js';
 import './ride-summary.js';
 import './ride-finished.js';
 import './pedal-settings.js';
