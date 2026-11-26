@@ -11,6 +11,13 @@
 // changes, the ramp test's result, and every error. Sent in batches every 15
 // s and when the page is hidden. The privacy page says so.
 //
+// And, for the Strava launch (rider, Nov 26, 2026: "I'll just want to see if
+// they click around, exactly what they do on the site"): every click on
+// something clickable, by its label (`clickLabel`: never a value typed into a
+// field), the workout searches, how far down each screen they scrolled, and
+// at the visit whether this browser can ride at all (Web Bluetooth: iOS
+// cannot) and whether it is Strava's in-app browser.
+//
 import { xf } from './functions.js';
 import { FLAVOR } from './flavor.js';
 import strava from './models/strava-direct.js';
@@ -68,6 +75,30 @@ function defaultSend(batch, beacon) {
 
 const PAGES = {workouts: 'home', home: 'ride', settings: 'settings'};
 
+// what a click was on, in words: the clickable thing's own label, never what
+// was typed into a field. null for a click on nothing clickable.
+const CLICKABLE = 'button, a, [role="button"], [data-act], [data-id], navigation-action, page-btn, tab-btn, connection-switch, .lc--win, .menu--btn, .control--btn, summary, label';
+const clean = (t) => String(t ?? '').replace(/\s+/g, ' ').trim();
+export function clickLabel(target) {
+    const el = target?.closest?.(CLICKABLE);
+    if(!el || el.matches('input, textarea, select')) return null;
+    const card = el.matches('[data-id]') ? clean(el.querySelector('h1, h2, h3, h4, .name, [class*="name"], [class*="title"]')?.textContent) : '';
+    const text = clean(el.getAttribute('aria-label')) || card || clean(el.textContent) || clean(el.getAttribute('title'));
+    const name = (text || el.id || el.dataset?.act || el.tagName.toLowerCase()).slice(0, 80);
+    const tag = el.id ? `#${el.id}` : el.dataset?.act ? `[${el.dataset.act}]` : el.tagName.toLowerCase();
+    return {el: name, tag, href: el.tagName === 'A' ? (el.getAttribute('href') || '').slice(0, 120) : undefined};
+}
+
+// the browser, in the words that matter for this app
+export function browserOf(nav = globalThis.navigator) {
+    const ua = nav?.userAgent ?? '';
+    return {
+        bluetooth: !!(nav && 'bluetooth' in nav),
+        mobile: /Mobi|iPhone|iPad|Android/i.test(ua),
+        inApp: /Strava/i.test(ua) ? 'strava' : /FBAN|FBAV|Instagram|Line\/|wv\)/.test(ua) ? 'other' : null,
+    };
+}
+
 function start(log) {
     const e = log.event;
     e('load', {
@@ -75,9 +106,42 @@ function start(log) {
         screen: globalThis.screen ? `${screen.width}×${screen.height}` : null, lang: globalThis.navigator?.language ?? null,
         app: globalThis.matchMedia?.('(display-mode: standalone)')?.matches ? 'installed' : 'browser',
         query: location.search ? location.search.slice(0, 120) : null,
+        window: globalThis.innerWidth ? `${innerWidth}×${innerHeight}` : null,
+        ...browserOf(),
     });
-    let page = null;
-    xf.sub('db:page', (p) => { if(p !== page) { page = p; e('page', {page: PAGES[p] ?? p}); } });
+    // the app opens on Home (the page set before this subscribed is not sent again)
+    let page = 'workouts';
+    // how far down each screen they got, said when they leave it
+    let deepest = 0;
+    const depth = () => { if(deepest > 0) { e('scroll', {page: PAGES[page] ?? page, pct: Math.round(deepest * 100)}); deepest = 0; } };
+    document.addEventListener('scroll', (ev) => {
+        const el = ev.target === document ? document.scrollingElement : ev.target;
+        if(!el || !(el.scrollHeight > el.clientHeight + 40)) return;
+        deepest = Math.max(deepest, Math.min(1, (el.scrollTop + el.clientHeight) / el.scrollHeight));
+    }, {capture: true, passive: true});
+    xf.sub('db:page', (p) => { if(p !== page) { depth(); page = p; e('page', {page: PAGES[p] ?? p}); } });
+    // every click on something clickable
+    let lastClick = {el: null, t: 0};
+    // the screen the click was made on: a nav button changes it on pointerup,
+    // before the click arrives
+    let pageAtDown = page;
+    document.addEventListener('pointerdown', () => { pageAtDown = page; }, {capture: true, passive: true});
+    document.addEventListener('click', (ev) => {
+        const c = clickLabel(ev.target);
+        if(!c) return;
+        const now = Date.now();
+        if(c.el === lastClick.el && now - lastClick.t < 400) return;
+        lastClick = {el: c.el, t: now};
+        e('click', {...c, page: PAGES[pageAtDown] ?? pageAtDown});
+    }, {capture: true});
+    // the workout search, once they pause typing
+    let typing = null;
+    document.addEventListener('input', (ev) => {
+        if(!ev.target?.matches?.('input[type="search"]')) return;
+        clearTimeout(typing);
+        const q = clean(ev.target.value).slice(0, 60);
+        if(q.length >= 2) typing = setTimeout(() => e('search', {q}), 1200);
+    }, {capture: true});
     xf.sub('action:nav', (a) => { if(typeof a === 'string' && a.includes(':')) e('tab', {tab: a.split(':')[1]}); });
     let workout = null;
     xf.sub('db:workout', (w) => { const n = w?.meta?.name; if(n && n !== workout) { workout = n; e('workout', {name: n, category: w.meta?.category ?? null}); } });
@@ -114,7 +178,7 @@ function start(log) {
     window.addEventListener('unhandledrejection', (ev) => log.error(ev.reason?.message ?? ev.reason));
     const loadedAt = Date.now();
     document.addEventListener('visibilitychange', () => {
-        if(document.visibilityState === 'hidden') { e('hidden', {after_s: Math.round((Date.now() - loadedAt) / 1000)}); log.flush(true); }
+        if(document.visibilityState === 'hidden') { depth(); e('hidden', {after_s: Math.round((Date.now() - loadedAt) / 1000)}); log.flush(true); }
     });
     window.addEventListener('pagehide', () => log.flush(true));
     setInterval(() => log.flush(), FLUSH_MS);

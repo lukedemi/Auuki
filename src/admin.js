@@ -7,7 +7,7 @@ const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
 const when = (ts) => new Date(ts).toLocaleString([], {month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', second: '2-digit'});
 const ago = (ts) => { const s = (Date.now() - ts) / 1000; return s < 90 ? `${Math.round(s)} s ago` : s < 5400 ? `${Math.round(s / 60)} min ago` : s < 129600 ? `${Math.round(s / 3600)} h ago` : `${Math.round(s / 86400)} d ago`; };
-const browser = (ua = '') => (/iPhone|iPad/.test(ua) ? 'iOS' : /Android/.test(ua) ? 'Android' : /Mac OS/.test(ua) ? 'Mac' : /Windows/.test(ua) ? 'Windows' : /Linux/.test(ua) ? 'Linux' : '') + (/Edg\//.test(ua) ? ' Edge' : /Chrome\//.test(ua) ? ' Chrome' : /Firefox\//.test(ua) ? ' Firefox' : /Safari\//.test(ua) ? ' Safari' : '');
+const browser = (ua = '') => /Strava/i.test(ua) ? `Strava app (${/iPhone|iPad/.test(ua) ? 'iOS' : /Android/.test(ua) ? 'Android' : '?'})` : (/iPhone|iPad/.test(ua) ? 'iOS' : /Android/.test(ua) ? 'Android' : /Mac OS/.test(ua) ? 'Mac' : /Windows/.test(ua) ? 'Windows' : /Linux/.test(ua) ? 'Linux' : '') + (/Edg\//.test(ua) ? ' Edge' : /Chrome\//.test(ua) ? ' Chrome' : /Firefox\//.test(ua) ? ' Firefox' : /Safari\//.test(ua) ? ' Safari' : '');
 
 let visitor = null, oldest = null, timer = null;
 const api = async (path) => { const r = await fetch(`./api/admin/${path}`, {cache: 'no-store'}); if(!r.ok) throw new Error(`${r.status}`); return r.json(); };
