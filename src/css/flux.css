@@ -4582,3 +4582,6 @@ and (orientation: landscape) {
     .menu--btn { flex-basis: 66px; }
     .watch .control--btn { margin: 0 2px; }
 }
+
+/* a setting's one-line explanation, under its name (Spiral Rescue) */
+.option--hint { display: block; margin-top: 4px; font-size: 13px; font-weight: 400; opacity: 0.6; line-height: 1.35; text-transform: none; letter-spacing: 0; }

@@ -172,6 +172,12 @@ function start(log) {
     xf.sub('rider:restored', (r) => e('settings:restored', r));
     xf.sub('ramp-test:result', (r) => e('ramp-test:result', r));
     xf.sub('ui:ftp-set', (f) => e('ftp:set', {ftp: f}));
+    let rescuing = false;
+    xf.sub('powerMatch:rescue', (r) => {
+        if(r?.on && !rescuing) e('spiral:rescue', {cadence: Math.round(r.cadence ?? 0), target: Math.round(r.target ?? 0), workout});
+        if(!r?.on && rescuing) e('spiral:recovered');
+        rescuing = !!r?.on;
+    });
     xf.sub('group:created', (g) => e('group:created', g));
     xf.sub('group:mode', (on) => e(on ? 'group:joined' : 'group:left'));
     window.addEventListener('error', (ev) => log.error(ev.message, {src: ev.filename?.split('/').pop(), line: ev.lineno}));
