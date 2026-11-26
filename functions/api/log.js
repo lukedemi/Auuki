@@ -49,6 +49,28 @@ export async function record(env, request, {kind, who = null, visitor = null, da
     } catch(e) {}
 }
 
+// A push to the rider's phone, through Home Assistant's notify.pushover_debug
+// (Luke only, priority 0: the house rule). Never fails the request it is in.
+export async function push(env, {title, message, url = null, urlTitle = null}, fetcher = (...a) => fetch(...a)) {
+    if(!env?.HA_URL || !env?.HA_TOKEN) return false;
+    try {
+        const r = await fetcher(`${env.HA_URL.replace(/\/$/, '')}/api/services/notify/pushover_debug`, {
+            method: 'POST',
+            headers: {authorization: `Bearer ${env.HA_TOKEN}`, 'content-type': 'application/json'},
+            body: JSON.stringify({title, message, data: {priority: 0, ...(url ? {url, url_title: urlTitle ?? url} : {})}}),
+        });
+        return !!r?.ok;
+    } catch(e) { return false; }
+}
+
+// "iOS Safari", "Mac Chrome", "Strava app (iOS)"
+export function deviceOf(ua = '') {
+    const os = /iPhone|iPad/.test(ua) ? 'iOS' : /Android/.test(ua) ? 'Android' : /Mac OS/.test(ua) ? 'Mac' : /Windows/.test(ua) ? 'Windows' : /Linux/.test(ua) ? 'Linux' : 'unknown';
+    if(/Strava/i.test(ua)) return `Strava app (${os})`;
+    const b = /Edg\//.test(ua) ? 'Edge' : /Chrome\//.test(ua) ? 'Chrome' : /Firefox\//.test(ua) ? 'Firefox' : /Safari\//.test(ua) ? 'Safari' : '';
+    return [os, b].filter(Boolean).join(' ');
+}
+
 export async function onRequestPost({request, env}) {
     if(!env.DB) return json({error: 'logging is not set up here'}, 503);
     const text = await request.text();

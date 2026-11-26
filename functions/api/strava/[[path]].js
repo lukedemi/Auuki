@@ -18,7 +18,7 @@
 // Nothing else is forwarded. Secrets: STRAVA_CLIENT_ID, STRAVA_CLIENT_SECRET.
 //
 
-import { record } from '../log.js';
+import { record, push, place, deviceOf } from '../log.js';
 
 const OAUTH = 'https://www.strava.com/oauth';
 const API = 'https://www.strava.com/api/v3';
@@ -57,6 +57,19 @@ async function oauthToken(env, params, onTokens = null) {
     return json(t);
 }
 
+// the push for a Strava connect: who, from where, on what, and their profile
+export function connectPush(athlete, where = {}, origin = '') {
+    const name = [athlete?.firstname, athlete?.lastname].filter(Boolean).join(' ') || 'Someone';
+    const from = [where.city, where.country].filter(Boolean).join(', ');
+    const site = origin ? new URL(origin).host : 'infERGno';
+    return {
+        title: `${name} connected Strava`,
+        message: [`On ${site}`, from && `from ${from}`, where.ua && `on ${deviceOf(where.ua)}`].filter(Boolean).join(' · ') + '.',
+        url: athlete?.id ? `https://www.strava.com/athletes/${athlete.id}` : (origin ? `${origin}/admin` : null),
+        urlTitle: athlete?.id ? 'Their Strava profile' : 'The log',
+    };
+}
+
 export async function onRequest({request, env, params}) {
     if(!env.STRAVA_CLIENT_ID || !env.STRAVA_CLIENT_SECRET) return json({error: 'Strava is not set up on this server'}, 503);
     const path = (params.path ?? []).join('/');
@@ -66,10 +79,13 @@ export async function onRequest({request, env, params}) {
     if(path === 'token' && method === 'POST') {
         const {code} = await request.json().catch(() => ({}));
         if(!code) return json({error: 'no code'}, 400);
-        // someone connected their Strava: logged with who they are (log.js)
+        // someone connected their Strava: logged with who they are (log.js),
+        // and a push to the rider (Nov 26, 2026: "If they connect via
+        // Strava, I definitely need to be alerted")
         return oauthToken(env, {code, grant_type: 'authorization_code'}, async (t) => {
             const name = [t.athlete?.firstname, t.athlete?.lastname].filter(Boolean).join(' ') || null;
             await record(env, request, {kind: 'strava:connect', who: name, visitor: request.headers?.get?.('x-infergno-visitor') ?? null, data: {athlete: t.athlete?.id ?? null}});
+            await push(env, connectPush(t.athlete, place(request), new URL(request.url).origin));
         });
     }
     if(path === 'refresh' && method === 'POST') {

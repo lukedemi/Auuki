@@ -102,3 +102,55 @@ describe('hosting a group ride', () => {
         expect(await notify({}, {title: 'x', host: 'y', startAt: 0, minutes: 1, link: 'l', site: 's'})).toBe(false);
     });
 });
+
+// Nov 26, 2026, for the Strava launch: what was clicked, the browser, and a push on a Strava connect
+import { clickLabel, browserOf } from '../src/log.js';
+import { push, deviceOf } from '../functions/api/log.js';
+import { connectPush } from '../functions/api/strava/[[path]].js';
+
+describe('what a click was on', () => {
+    const dom = (html) => { const d = document.createElement('div'); d.innerHTML = html; document.body.appendChild(d); return d; };
+    test('a button by its words, a workout card by its name, a link with its href', () => {
+        const d = dom(`<button class="ht--ride" data-act="ride">▶ Ride</button>
+            <button class="ht--card" data-id="w1"><div class="g"><svg></svg></div><div><div class="name">Threshold 5×5 min</div><div class="kind">Threshold</div></div></button>
+            <a href="./privacy">Privacy</a><button aria-label="Workout intensity up">+</button>
+            <input type="search" value="vo2"><div class="plain">nothing</div>`);
+        expect(clickLabel(d.querySelector('.ht--ride'))).toEqual({el: '▶ Ride', tag: '[ride]', href: undefined});
+        expect(clickLabel(d.querySelector('.kind')).el).toBe('Threshold 5×5 min');
+        expect(clickLabel(d.querySelector('a'))).toMatchObject({el: 'Privacy', href: './privacy'});
+        expect(clickLabel(d.querySelector('[aria-label]')).el).toBe('Workout intensity up');
+        expect(clickLabel(d.querySelector('input'))).toBe(null);        // never what is typed
+        expect(clickLabel(d.querySelector('.plain'))).toBe(null);
+    });
+});
+
+describe('the browser', () => {
+    test('iOS in the Strava app cannot ride', () => {
+        const b = browserOf({userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Strava/401.0.0'});
+        expect(b).toEqual({bluetooth: false, mobile: true, inApp: 'strava'});
+        expect(deviceOf('Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) Mobile/15E148 Strava/401.0.0')).toBe('Strava app (iOS)');
+    });
+    test('desktop Chrome can', () => {
+        const b = browserOf({userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36', bluetooth: {}});
+        expect(b).toEqual({bluetooth: true, mobile: false, inApp: null});
+        expect(deviceOf('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/131.0 Safari/537.36')).toBe('Mac Chrome');
+    });
+});
+
+describe('a Strava connect pushes to the rider', () => {
+    test('who, from where, on what, with their profile', () => {
+        const p = connectPush({id: 123, firstname: 'Ada', lastname: 'L'}, {city: 'Leeds', country: 'GB', ua: 'Mozilla/5.0 (Windows NT 10.0) Chrome/131.0 Safari/537.36'}, 'https://infergno.com');
+        expect(p).toEqual({title: 'Ada L connected Strava', message: 'On infergno.com · from Leeds, GB · on Windows Chrome.',
+            url: 'https://www.strava.com/athletes/123', urlTitle: 'Their Strava profile'});
+    });
+    test('through Home Assistant, priority 0, and never throws', async () => {
+        const calls = [];
+        const ok = await push({HA_URL: 'https://ha.example/', HA_TOKEN: 't'}, {title: 'T', message: 'M', url: 'u', urlTitle: 'U'},
+            async (url, init) => { calls.push([url, JSON.parse(init.body)]); return {ok: true}; });
+        expect(ok).toBe(true);
+        expect(calls[0][0]).toBe('https://ha.example/api/services/notify/pushover_debug');
+        expect(calls[0][1]).toEqual({title: 'T', message: 'M', data: {priority: 0, url: 'u', url_title: 'U'}});
+        expect(await push({HA_URL: 'x', HA_TOKEN: 't'}, {title: 'T', message: 'M'}, async () => { throw new Error('down'); })).toBe(false);
+        expect(await push({}, {title: 'T', message: 'M'})).toBe(false);
+    });
+});
