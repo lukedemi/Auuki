@@ -7,6 +7,15 @@
 // live-samples.js, so it draws while the timer runs and keeps the last ride
 // on screen after it stops.
 //
+// A third of each fixed window is the future (rider, Nov 26, 2026: "Almost a
+// third of it should be into the future, so you can see upcoming intervals as
+// they kind of come into view… I have 30 seconds left until the next
+// interval, and it's pretty hard to tell how far away I am"). Now is a line
+// two-thirds across; to its right the workout's coming targets, from the
+// step running and its time left (ahead()), fainter than the past, with the
+// time to the next change and its watts at that edge. Ride fits the whole
+// ride and has no future.
+//
 
 import { xf, exists } from '../functions.js';
 import { models } from '../models/models.js';
@@ -19,6 +28,7 @@ const WINDOWS = [
     { key: 'ride', label: 'Ride',   s: Infinity, smooth: 15 },
 ];
 const STORE = 'live-chart-window';
+const FUTURE = 1 / 3;              // of a fixed window, ahead of now
 const ZONE_VAR = {
     one: '--zone-gray', two: '--zone-blue', three: '--zone-teal', four: '--zone-green',
     five: '--zone-yellow', six: '--zone-orange', seven: '--zone-red',
@@ -42,6 +52,9 @@ live-chart svg { flex: 1; width: 100%; min-height: 0; display: block; }
 live-chart .lc--empty { fill: currentColor; opacity: 0.45; font-size: 14px; }
 live-chart .lc--grid { stroke: currentColor; opacity: 0.12; }
 live-chart .lc--glabel { fill: currentColor; opacity: 0.45; font-size: 11px; }
+live-chart .lc--now { stroke: currentColor; stroke-width: 1.5; opacity: 0.55; }
+live-chart .lc--edge { stroke: currentColor; stroke-width: 1; stroke-dasharray: 3 3; opacity: 0.35; }
+live-chart .lc--next { fill: currentColor; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
 `;
 
 // the same running mean everywhere: n samples back
@@ -69,6 +82,52 @@ function bucket(rows, cols, pick) {
     }
     return out;
 }
+
+// The workout's targets from now on, for `seconds`: [{from, to, w}] in
+// seconds from now. The step running keeps its live target (a nudge, the
+// workout's %), for the `stepLeft` seconds it has left; later steps are
+// FTP × step % × intensity %, as watch.js sets them. A step with no power
+// (a SIM step) is a gap; one with no duration (a distance step) ends it.
+export function ahead({workout, iv, st, stepLeft, target, ftp, intensity = 100, seconds}) {
+    const intervals = workout?.intervals;
+    if(!intervals?.[iv]?.steps?.[st] || !(seconds > 0)) return [];
+    const out = [];
+    let t = Math.max(0, stepLeft || 0);
+    if(t > 0 && target > 0) out.push({from: 0, to: Math.min(t, seconds), w: target});
+    let i = iv, j = st + 1;
+    while(t < seconds && i < intervals.length) {
+        const steps = intervals[i]?.steps ?? [];
+        if(j >= steps.length) { i += 1; j = 0; continue; }
+        const step = steps[j];
+        const d = step?.duration;
+        if(!(d > 0)) break;
+        const w = exists(step.power) ? Math.round(models.ftp.toAbsolute(step.power, ftp) * intensity / 100) : 0;
+        if(w > 0) {
+            const prev = out[out.length - 1];
+            // one block per target: a ramp's stair stays stairs, a repeat of
+            // the same watts across steps is one block
+            if(prev && prev.w === w && prev.to === t) prev.to = Math.min(t + d, seconds);
+            else out.push({from: t, to: Math.min(t + d, seconds), w});
+        }
+        t += d;
+        j += 1;
+    }
+    return out;
+}
+
+// the first change of target in ahead()'s blocks: a new block, or the gap
+// after the step running (a SIM step, the end of the workout: w 0)
+export function nextChange(blocks) {
+    if(!blocks.length) return null;
+    const first = blocks[0];
+    if(first.from > 0) return {from: first.from, w: first.w};
+    const second = blocks[1];
+    if(second && second.from === first.to) return {from: second.from, w: second.w};
+    return {from: first.to, w: 0};
+}
+
+// m:ss
+const mss = (s) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
 
 export function windowStats(rows) {
     const n = rows.length;
@@ -118,6 +177,15 @@ class LiveChart extends HTMLElement {
             this.render();
         }, signal);
 
+        this.plan = {workout: null, iv: 0, st: 0, stepLeft: 0, target: 0, intensity: 100, status: 'stopped'};
+        const keep = (k) => (v) => { this.plan[k] = v; };
+        xf.sub('db:workout',       keep('workout'), signal);
+        xf.sub('db:intervalIndex', keep('iv'), signal);
+        xf.sub('db:stepIndex',     keep('st'), signal);
+        xf.sub('db:stepTime',      keep('stepLeft'), signal);
+        xf.sub('db:powerTarget',   keep('target'), signal);
+        xf.sub('db:intensity',     keep('intensity'), signal);
+        xf.sub('db:workoutStatus', (v) => { this.plan.status = v; this.render(); }, signal);
         xf.sub('live:sample', () => this.render(), signal);
         xf.sub('db:ftp', (ftp) => { this.ftp = ftp || this.ftp; this.render(); }, signal);
         window.addEventListener('resize', () => this.render(), signal);
@@ -143,7 +211,10 @@ class LiveChart extends HTMLElement {
 
         const all = liveSamples.all();
         const last = all.length ? all[all.length - 1].t : 0;
-        const from = Number.isFinite(this.win.s) ? Math.max(0, last - this.win.s) : 0;
+        const fixed = Number.isFinite(this.win.s);
+        // a fixed window: two-thirds behind now, a third ahead, from the first
+        // second (the start of a ride is an empty left, not a moving now line)
+        const from = fixed ? last - this.win.s * (1 - FUTURE) : 0;
         const rows = all.filter((r) => r.t > from);
 
         const st = windowStats(rows);
@@ -157,15 +228,20 @@ class LiveChart extends HTMLElement {
 
         // x: a fixed window fills from the left, then scrolls; Ride fits it all
         const x0 = from;
-        const x1 = Number.isFinite(this.win.s) ? Math.max(from + this.win.s, last) : Math.max(last, 60);
+        const x1 = fixed ? from + this.win.s : Math.max(last, 60);
         const padL = 34;
         const x = (t) => padL + (W - padL) * (t - x0) / (x1 - x0);
 
         const ftp = this.ftp || 250;
+        const p = this.plan ?? {};
+        const plan = {workout: p.workout, iv: p.iv, st: p.st, stepLeft: p.stepLeft, target: p.target, ftp, intensity: p.intensity || 100};
+        const future = (fixed && p.status === 'started') ? ahead({...plan, seconds: x1 - last}) : [];
+        // the next change of target, even past the window's edge
+        const next = (fixed && p.status === 'started') ? nextChange(ahead({...plan, seconds: 24 * 3600})) : null;
         const n = Math.max(1, this.win.smooth);
         const ps = smooth(rows.map((r) => r.w || 0), n);
         const smoothed = rows.map((r, i) => ({ t: r.t, w: ps[i], hr: r.hr, target: r.target }));
-        const topW = Math.max(ftp, 1.15 * Math.max(...ps, ...rows.map((r) => r.target || 0)));
+        const topW = Math.max(ftp, 1.15 * Math.max(...ps, ...rows.map((r) => r.target || 0), ...future.map((f) => f.w)));
         const pmax = Math.min(2.5 * ftp, topW);
         const y = (w) => H - (H - 4) * Math.min(w, pmax) / pmax;
 
@@ -197,6 +273,32 @@ class LiveChart extends HTMLElement {
             runStart = i;
         }
 
+        // the future: the coming targets, fainter, right of a now line, with
+        // the time to the next change and its watts at that edge
+        if(fixed && x1 > last) {
+            const xn = x(last);
+            for(const f of future) {
+                const zone = models.ftp.powerToZone(f.w, ftp)?.name ?? 'one';
+                const xa = x(last + f.from), xb = x(last + f.to);
+                out.push(`<rect class="lc--ahead" x="${xa.toFixed(1)}" y="${y(f.w).toFixed(1)}" width="${Math.max(0.5, xb - xa).toFixed(1)}" height="${(H - y(f.w)).toFixed(1)}" style="fill: var(${ZONE_VAR[zone] ?? '--zone-gray'})" opacity="0.22"/>`);
+                out.push(`<line x1="${xa.toFixed(1)}" x2="${xb.toFixed(1)}" y1="${y(f.w).toFixed(1)}" y2="${y(f.w).toFixed(1)}" style="stroke: var(${ZONE_VAR[zone] ?? '--zone-gray'})" stroke-width="2" stroke-dasharray="4 3" opacity="0.9"/>`);
+            }
+            if(next) {
+                const label = `${mss(next.from)} → ${next.w ? `${next.w} W` : 'free'}`;
+                if(last + next.from <= x1) {
+                    const xe = x(last + next.from);
+                    out.push(`<line class="lc--edge" x1="${xe.toFixed(1)}" x2="${xe.toFixed(1)}" y1="0" y2="${H}"/>`);
+                    const right = xe + 5 + 90 <= W;
+                    const ty = Math.max(14, Math.min(H - 6, (next.w ? y(next.w) : H) - 6));
+                    out.push(`<text class="lc--next" x="${(right ? xe + 5 : xe - 5).toFixed(1)}" y="${ty.toFixed(1)}" text-anchor="${right ? 'start' : 'end'}">${label}</text>`);
+                } else {
+                    // beyond the window: pinned to its right edge
+                    out.push(`<text class="lc--next" x="${W - 4}" y="16" text-anchor="end">${label} ›</text>`);
+                }
+            }
+            out.push(`<line class="lc--now" x1="${xn.toFixed(1)}" x2="${xn.toFixed(1)}" y1="0" y2="${H}"/>`);
+        }
+
         // heart rate, fitted to what the window holds
         const cols = Math.max(20, Math.round((W - padL) / 2));
         const hrRows = smoothed.filter((r) => r.hr > 0);
@@ -219,4 +321,4 @@ class LiveChart extends HTMLElement {
 
 customElements.define('live-chart', LiveChart);
 
-export { LiveChart, smooth, bucket, WINDOWS };
+export { LiveChart, smooth, bucket, WINDOWS, FUTURE };
