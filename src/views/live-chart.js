@@ -84,6 +84,33 @@ function bucket(rows, cols, pick) {
     return out;
 }
 
+// The power axis, fixed for the ride (rider, Nov 26, 2026: "the top panel,
+// axis changes throughout the workout. We should just pick an axis and stick
+// with it ... on a 12-minute interval, on the 10-minute view, it jumps right
+// in the last 2 minutes and then jumps back afterward"). It was fitted to
+// what the window held, the coming targets included, so a harder interval
+// scrolling in or out rescaled everything. Now: the workout's hardest target
+// (at its Workout %) plus 15% headroom, at least 110% of FTP; 150% of FTP
+// with no workout; never above 250%. Power above the top is drawn at the top.
+export function powerTop({workout, ftp, intensity = 100}) {
+    ftp = ftp > 0 ? ftp : 250;
+    let hardest = 0;
+    for(const iv of workout?.intervals ?? []) {
+        for(const st of iv?.steps ?? []) {
+            if(exists(st?.power)) hardest = Math.max(hardest, models.ftp.toAbsolute(st.power, ftp) * intensity / 100);
+        }
+    }
+    const top = hardest > 0 ? Math.max(1.1 * ftp, 1.15 * hardest) : 1.5 * ftp;
+    return Math.round(Math.min(2.5 * ftp, top));
+}
+
+// The heart-rate axis, fixed too: 80 to 190 bpm, widened (never narrowed)
+// when a ride goes outside it.
+export function hrRange(hs, was = [80, 190]) {
+    if(!hs.length) return was;
+    return [Math.min(was[0], Math.min(...hs) - 5), Math.max(was[1], Math.max(...hs) + 5)];
+}
+
 // m:ss
 const mss = (s) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
 
@@ -199,8 +226,7 @@ class LiveChart extends HTMLElement {
         const n = Math.max(1, this.win.smooth);
         const ps = smooth(rows.map((r) => r.w || 0), n);
         const smoothed = rows.map((r, i) => ({ t: r.t, w: ps[i], hr: r.hr, target: r.target }));
-        const topW = Math.max(ftp, 1.15 * Math.max(...ps, ...rows.map((r) => r.target || 0), ...future.map((f) => f.w)));
-        const pmax = Math.min(2.5 * ftp, topW);
+        const pmax = powerTop({workout: p.workout, ftp, intensity: p.intensity || 100});
         const y = (w) => H - (H - 4) * Math.min(w, pmax) / pmax;
 
         const out = [];
@@ -262,8 +288,12 @@ class LiveChart extends HTMLElement {
         const hrRows = smoothed.filter((r) => r.hr > 0);
         if(hrRows.length > 1) {
             const hs = hrRows.map((r) => r.hr);
-            let lo = Math.min(...hs) - 5, hi = Math.max(...hs) + 5;
-            if(hi - lo < 40) { const mid = (hi + lo) / 2; lo = mid - 20; hi = mid + 20; }
+            // widened by anything this ride has reached, so it never jumps back
+            // (a new ride starts the samples over)
+            if(!this.hrAxis || all.length < (this.hrAxisLen ?? 0)) this.hrAxis = [80, 190];
+            this.hrAxisLen = all.length;
+            this.hrAxis = hrRange(hs, this.hrAxis);
+            const [lo, hi] = this.hrAxis;
             const yh = (v) => H - (H - 4) * (v - lo) / (hi - lo);
             const pts = bucket(hrRows, cols, (r) => r.hr).map(([t, v]) => `${x(t).toFixed(1)},${yh(v).toFixed(1)}`);
             out.push(`<polyline points="${pts.join(' ')}" fill="none" style="stroke: var(--zone-red, #ff6b6b)" stroke-width="1.5" opacity="0.85"/>`);

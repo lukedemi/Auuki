@@ -52,3 +52,28 @@ describe('the live chart looks ahead', () => {
         expect(nextChange([])).toBe(null);
     });
 });
+
+import { powerTop, hrRange } from '../src/views/live-chart.js';
+
+// Nov 26, 2026: "pick an axis and stick with it"
+describe('the live chart keeps one axis for the ride', () => {
+    const ftp = 250;
+    const threshold = {intervals: [{steps: [{duration: 600, power: 0.6}]}, {steps: [{duration: 720, power: 1.0}]}, {steps: [{duration: 300, power: 0.5}]}]};
+    test('the hardest target plus 15%, whatever the window holds', () => {
+        expect(powerTop({workout: threshold, ftp})).toBe(288);            // 250 x 1.15
+    });
+    test('an easy workout still shows FTP', () => {
+        expect(powerTop({workout: {intervals: [{steps: [{duration: 3600, power: 0.65}]}]}, ftp})).toBe(275);
+    });
+    test('the workout % moves it; a free ride gets 150%; the ramp test tops out at 250%', () => {
+        expect(powerTop({workout: threshold, ftp, intensity: 110})).toBe(316);
+        expect(powerTop({workout: null, ftp})).toBe(375);
+        expect(powerTop({workout: {intervals: [{steps: [{duration: 60, power: 2.0}]}]}, ftp})).toBe(575);
+        expect(powerTop({workout: {intervals: [{steps: [{duration: 60, power: 3.0}]}]}, ftp})).toBe(625);
+    });
+    test('heart rate: 80 to 190, widened and never narrowed', () => {
+        expect(hrRange([120, 150])).toEqual([80, 190]);
+        expect(hrRange([75, 192])).toEqual([70, 197]);
+        expect(hrRange([130], [70, 197])).toEqual([70, 197]);
+    });
+});
