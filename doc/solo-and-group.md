@@ -24,5 +24,6 @@ a row here in the same change.**
 | End of the workout | Switches to SIM at 0% | Stays in ERG at the last target: the group's cool-down, ERG free, as long as anyone likes | `watch.js` workout done |
 | Ramp test | The test: failure detection, straight into the cool-down, the result screen | **Not blocked yet** — a host could pick it, and its failure jump would do nothing. Solo only by design | `ramp-test.js` |
 | Power Match | On | On (it corrects each rider's own trainer) | `power-match.js` |
+| Spiral rescue (Nov 26, 2026) | Under 40 rpm for 3 s, the trainer drops to half the target until the cadence holds 60+ rpm, with a banner; Settings → Spiral Rescue | The same: it moves only the rider's own trainer, never the clock | `power-match.js` `onCadence`, `views/spiral-rescue.js` |
 | The trainer leads a step up (Nov 26, 2026) | With 2 s left before a step up of 30 W+, the trainer climbs so it is at the target as the interval starts | The same: it reads the step and its time left, which the group's clock sets | `power-match.js` `onStepTime`, `plan-ahead.js` |
 | Auto-pause when the rider stops pedalling, auto-resume when they start | On | On; the resume is immediate (no ramp-back) | `watch.js` |

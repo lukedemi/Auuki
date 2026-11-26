@@ -1834,6 +1834,23 @@ class PowerMatchSetting extends AutoPause {
 
 customElements.define('power-match-setting', PowerMatchSetting);
 
+// Settings > Spiral Rescue: On by default (power-match.js, rider, Nov 26,
+// 2026: "It should be toggle offable if people want to do low cadence drills")
+class SpiralRescueSetting extends AutoPause {
+    postInit() {
+        this.effect  = 'sources';
+        this.key     = 'spiralRescue';
+        this.state   = true;
+        this.values  = {on: {spiralRescue: true}, off: {spiralRescue: false}};
+    }
+    onUpdate(value) {
+        this.state = value[this.key] ?? true;
+        this.render();
+    }
+}
+
+customElements.define('spiral-rescue-setting', SpiralRescueSetting);
+
 // Settings > Power Match Debug: the overlay in power-match-debug.js
 class PowerMatchDebugSetting extends AutoPause {
     postInit() {

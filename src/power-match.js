@@ -20,6 +20,7 @@
 
 import { xf, exists, equals, } from './functions.js';
 import { ahead, nextChange } from './plan-ahead.js';
+import { RAMP_TEST } from './workouts/workouts.js';
 
 const defaults = {
     tau:          20,     // s, time constant of the moving averages
@@ -332,9 +333,31 @@ function PowerMatch(args = {}) {
     const plan = {workout: null, iv: 0, st: 0, stepLeft: 0, ftp: 0, intensity: 100};
     let lead = null;                              // {to, until}: climbing to the next step's target
 
+    // Spiral rescue (rider, Nov 26, 2026: "If I get my cadence below like 20,
+    // it gets really hard, and I feel like it should save you from that, even
+    // if your power drops ... I saw my cadence at 30 for a little bit there").
+    // ERG holds watts, so as the legs slow it pushes harder, which slows them
+    // more: the spiral of death. Under RESCUE_RPM for RESCUE_S, the trainer
+    // lets go to half the target (never under RESCUE_MIN_W); once the cadence
+    // holds RECOVER_RPM for RECOVER_S, the target comes back over RECOVER_MS.
+    // Settings > Spiral Rescue turns it off (sources.spiralRescue), for
+    // low-cadence drills; a step that asks for a cadence under 60 and the
+    // ramp test (which fails on cadence) are left alone anyway. Solo and
+    // group alike: it moves only the trainer.
+    const RESCUE_RPM   = args.rescueRpm ?? 40;
+    const RESCUE_S     = args.rescueS ?? 3;
+    const RECOVER_RPM  = args.recoverRpm ?? 60;
+    const RECOVER_S    = args.recoverS ?? 2;
+    const RESCUE_PCT   = args.rescuePct ?? 0.5;
+    const RESCUE_MIN_W = args.rescueMinW ?? 60;
+    const RECOVER_MS   = args.recoverMs ?? 8000;
+    let rescue = null;                            // {since, cadence} while the load is let go
+    let lowSince = null, highSince = null;
+
     function eased(value) {
         if(!(value > 0)) return value;
         if(watchState === 'paused' && !rampingBack) return Math.min(value, EASE_FLOOR);
+        if(rescue) return Math.min(value, Math.max(RESCUE_MIN_W, Math.round(value * RESCUE_PCT)));
         if(ramp) {
             const k = (now() - ramp.start) / ramp.ms;
             if(k >= 1) { ramp = null; return value; }
@@ -362,6 +385,7 @@ function PowerMatch(args = {}) {
         const was = watchState;
         watchState = state;
         if(state !== 'started') lead = null;
+        if(state !== 'started' && rescue) { rescue = null; lowSince = highSince = null; xf.dispatch('powerMatch:rescue', {on: false, target}); }
         if(state === 'paused' && was !== 'paused') {
             ramp = null;
             send('ease:paused');
@@ -384,7 +408,7 @@ function PowerMatch(args = {}) {
     }
 
     function isEasing() {
-        return watchState === 'paused' || !!ramp;
+        return watchState === 'paused' || !!ramp || !!rescue;
     }
 
     function trainerTarget() {
@@ -451,6 +475,60 @@ function PowerMatch(args = {}) {
         send(event ?? (enabled ? 'enable' : 'disable'));
     }
 
+    // whether this moment may be rescued: riding a workout in ERG, the
+    // setting on, and not a step or a test that wants the low cadence
+    function rescuable() {
+        if(watchState !== 'started' || !(target > 0) || exists(sim)) return false;
+        if((sources.spiralRescue ?? true) === false) return false;
+        if(plan.workout?.meta?.name === RAMP_TEST) return false;
+        const step = plan.workout?.intervals?.[plan.iv]?.steps?.[plan.st];
+        if(step?.cadence > 0 && step.cadence < RECOVER_RPM) return false;
+        return true;
+    }
+
+    function onCadence(rpm) {
+        const t = now();
+        if(rescue) {
+            rescue.cadence = rpm;
+            if(!rescuable()) return endRescue('rescue:off');
+            if(rpm >= RECOVER_RPM) {
+                highSince ??= t;
+                if(t - highSince >= RECOVER_S * 1000) endRescue('rescue:done');
+            } else {
+                highSince = null;
+                xf.dispatch('powerMatch:rescue', {on: true, cadence: rpm, target, watts: lastSent});
+            }
+            return;
+        }
+        if(rpm > 0 && rpm < RESCUE_RPM && rescuable()) {
+            lowSince ??= t;
+            if(t - lowSince >= RESCUE_S * 1000) {
+                rescue = {since: t, cadence: rpm};
+                lowSince = highSince = null;
+                ramp = null;
+                lead = null;
+                send('rescue');
+                xf.dispatch('powerMatch:rescue', {on: true, cadence: rpm, target, watts: lastSent});
+            }
+        } else {
+            lowSince = null;
+        }
+    }
+
+    function endRescue(event) {
+        if(!rescue) return;
+        const from = lastSent;
+        rescue = null;
+        lowSince = highSince = null;
+        xf.dispatch('powerMatch:rescue', {on: false, target});
+        if(watchState === 'started' && target > 0) startRamp(from ?? target, RECOVER_MS, event);
+        else send(event);
+    }
+
+    function isRescuing() {
+        return !!rescue;
+    }
+
     function onSources(value = {}) {
         sources = Object.assign({}, value);
         updateEnabled();
@@ -502,7 +580,7 @@ function PowerMatch(args = {}) {
             }
             return;
         }
-        if(!(left > 0 && left <= STEP_LEAD_S) || watchState !== 'started' || ramp || rampingBack) return;
+        if(!(left > 0 && left <= STEP_LEAD_S) || watchState !== 'started' || ramp || rampingBack || rescue) return;
         if(!(target > 0) || !(plan.ftp > 0)) return;
         const next = nextChange(ahead({...plan, target, seconds: left + 1}));
         if(!next || next.from !== left || !(next.w - target >= STEP_RAMP_W)) return;
@@ -662,6 +740,7 @@ function PowerMatch(args = {}) {
         xf.sub('db:watchStatus',              onWatchStatus, signal);
         xf.sub('watch:rampback',              onRampback, signal);
         xf.sub('db:stepTime',                 onStepTime, signal);
+        xf.sub('db:cadence',                  onCadence, signal);
         xf.sub('db:workout',                  (w) => { plan.workout = w; }, signal);
         xf.sub('db:intervalIndex',            (i) => { plan.iv = i; }, signal);
         xf.sub('db:stepIndex',                (i) => { plan.st = i; }, signal);
@@ -684,6 +763,7 @@ function PowerMatch(args = {}) {
         core,
         trainerTarget,
         isEasing,
+        isRescuing,
         snapshot,
         simulate,
         isSimulating,

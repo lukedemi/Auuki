@@ -705,3 +705,96 @@ describe('the trainer leads a step up', () => {
         expect(sent.every(w => w === 125)).toBe(true);
     });
 });
+
+// Nov 26, 2026: "If I get my cadence below like 20, it gets really hard ...
+// I saw my cadence at 30 for a little bit there"
+describe('the spiral rescue', () => {
+    let pm, clock, sent, rescues, abort;
+    beforeEach(() => {
+        jest.useFakeTimers();
+        clock = 0;
+        sent = [];
+        rescues = [];
+        abort = new AbortController();
+        pm = PowerMatch({now: () => clock});
+        pm.start();
+        xf.sub('trainer:powerTarget', v => sent.push(v), {signal: abort.signal});
+        xf.sub('powerMatch:rescue', r => rescues.push(r), {signal: abort.signal});
+        xf.dispatch('db:sources', {sources: {}});
+        xf.dispatch('db:workout', {workout: {meta: {name: 'Threshold 5×5 min'}, intervals: [{steps: [{duration: 600, power: 0.88}]}]}});
+        xf.dispatch('db:intervalIndex', {intervalIndex: 0});
+        xf.dispatch('db:stepIndex', {stepIndex: 0});
+        xf.dispatch('db:watchStatus', {watchStatus: 'started'});
+        run(21);
+        xf.dispatch('db:powerTarget', {powerTarget: 248});
+        run(16);
+    });
+    afterEach(() => { pm.stop(); abort.abort(); jest.useRealTimers(); });
+    function run(seconds) { for(let i = 0; i < seconds; i++) { clock += 1000; jest.advanceTimersByTime(1000); } }
+    function pedal(rpm, seconds) {
+        for(let i = 0; i < seconds; i++) { xf.dispatch('db:cadence', {cadence: rpm}); clock += 1000; jest.advanceTimersByTime(1000); }
+    }
+
+    test('three seconds under 40 rpm drops the trainer to half, and says so', () => {
+        pedal(85, 5);
+        expect(sent[sent.length - 1]).toBe(248);
+        pedal(32, 2);
+        expect(pm.isRescuing()).toBe(false);          // a moment is not a spiral
+        pedal(30, 2);
+        expect(pm.isRescuing()).toBe(true);
+        expect(sent[sent.length - 1]).toBe(124);
+        expect(rescues[rescues.length - 1]).toMatchObject({on: true, cadence: 30, target: 248});
+    });
+
+    test('spinning back over 60 rpm for 2 s brings the target back over 8 s', () => {
+        pedal(28, 4);
+        expect(pm.isRescuing()).toBe(true);
+        pedal(50, 3);
+        expect(pm.isRescuing()).toBe(true);           // 50 is not out of it yet
+        pedal(75, 3);                                 // 2 s of it: three readings a second apart
+        expect(pm.isRescuing()).toBe(false);
+        expect(rescues[rescues.length - 1]).toMatchObject({on: false, target: 248});
+        const back = sent[sent.length - 1];
+        expect(back).toBeLessThan(160);
+        pedal(80, 4);
+        const mid = sent[sent.length - 1];
+        expect(mid).toBeGreaterThan(160);
+        expect(mid).toBeLessThan(248);
+        pedal(80, 5);
+        expect(sent[sent.length - 1]).toBe(248);
+    });
+
+    test('never under 60 W, and a new interval during it stays let go', () => {
+        xf.dispatch('db:powerTarget', {powerTarget: 100});
+        pedal(25, 4);
+        expect(sent[sent.length - 1]).toBe(60);
+        xf.dispatch('db:powerTarget', {powerTarget: 300});
+        expect(sent[sent.length - 1]).toBe(150);
+    });
+
+    test('off in Settings, it does nothing', () => {
+        xf.dispatch('db:sources', {sources: {spiralRescue: false}});
+        pedal(25, 6);
+        expect(pm.isRescuing()).toBe(false);
+        expect(sent[sent.length - 1]).toBe(248);
+    });
+
+    test('a low-cadence drill step and the ramp test are left alone', () => {
+        xf.dispatch('db:workout', {workout: {meta: {name: 'Endurance 90 min · cadence drills'}, intervals: [{steps: [{duration: 600, power: 0.7, cadence: 50}]}]}});
+        pedal(35, 6);
+        expect(pm.isRescuing()).toBe(false);
+        xf.dispatch('db:workout', {workout: {meta: {name: 'Test · ramp 1 min steps'}, intervals: [{steps: [{duration: 60, power: 1.2}]}]}});
+        pedal(35, 6);
+        expect(pm.isRescuing()).toBe(false);
+    });
+
+    test('stopping (cadence 0) is the pause, not a spiral; pausing ends a rescue', () => {
+        pedal(0, 6);
+        expect(pm.isRescuing()).toBe(false);
+        pedal(30, 4);
+        expect(pm.isRescuing()).toBe(true);
+        xf.dispatch('db:watchStatus', {watchStatus: 'paused'});
+        expect(pm.isRescuing()).toBe(false);
+        expect(rescues[rescues.length - 1]).toMatchObject({on: false});
+    });
+});
