@@ -140,8 +140,10 @@ function KeyboardControls() {
             xf.dispatch('ui:watchPause');
         }
     });
+    // L is the lap stopwatch (stopwatch.js, Nov 27, 2026); it no longer
+    // skips the interval, which the skip button and a controller's lap still do
     xf.sub('key:l', e => {
-        xf.dispatch('ui:watchLap');
+        xf.dispatch('ui:stopwatch');
     });
 }
 
