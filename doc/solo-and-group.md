@@ -17,7 +17,7 @@ a row here in the same change.**
 |---|---|---|---|
 | **Ramp-back after a pause** (Nov 26, 2026) | Resuming holds the clock for 10 s (`RAMPBACK_S`) while the trainer climbs from the paused easy load to the target; the overlay counts down *BACK IN 10* over *Ramping back to X W · the clock waits*; ▶, Space or Skip ends it early. Nothing is recorded during it, so the chart has no dip | Resumes at once, at wherever the group is, and Power Match eases up over 20 s instead (`EASE_MS`) | `watch.js` `shouldRampBack`, `power-match.js` `onRampback`, `views/pause-overlay.js` |
 | Pause | Stops the workout clock; resume picks up where it stopped | Stops recording only; the group's clock keeps going and a resume lands where everyone is | `watch.js` (the group branch of the tick), `group/group.js` |
-| Lap / skip forward or back (L, the skip buttons) | Moves to the next or previous interval | Off: a lap is recorded, the interval does not change | `watch.js` `lap`, `back` |
+| Lap / skip forward or back (the skip buttons, a controller's lap) | Moves to the next or previous interval | Off: a lap is recorded, the interval does not change | `watch.js` `lap`, `back` |
 | Jump to an interval | Works (the ramp test uses it to drop into its cool-down) | Off | `watch.js` `jump` |
 | +5 min on this interval | Stretches the current interval | Off, button disabled with a tooltip | `watch.js` `ui:interval-extend`, `views/data-views.js` |
 | Starting the workout | ▶, or auto-start when the rider pedals | The group's start time starts it; ▶ and pedalling start only the recording | `watch.js` `startWorkout`, `group/group.js` |
@@ -26,4 +26,5 @@ a row here in the same change.**
 | Power Match | On | On (it corrects each rider's own trainer) | `power-match.js` |
 | Spiral rescue (Nov 26, 2026) | Under 40 rpm for 3 s, the trainer drops to half the target until the cadence holds 60+ rpm, with a banner; Settings → Spiral Rescue | The same: it moves only the rider's own trainer, never the clock | `power-match.js` `onCadence`, `views/spiral-rescue.js` |
 | The trainer leads a step up (Nov 26, 2026) | With 2 s left before a step up of 30 W+, the trainer climbs so it is at the target as the interval starts | The same: it reads the step and its time left, which the group's clock sets | `power-match.js` `onStepTime`, `plan-ahead.js` |
+| **The lap stopwatch, L** (Nov 27, 2026) | L starts a small timer at the top of the live chart; each press starts a new lap from 0:00 and shows the last one. It runs on the ride's clock (holds while paused) and changes nothing else: no interval split or skipped, nothing recorded. A click puts it away | The same: it reads the clock and never moves it | `stopwatch.js`, `views/lap-stopwatch.js` |
 | Auto-pause when the rider stops pedalling, auto-resume when they start | On | On; the resume is immediate (no ramp-back) | `watch.js` |
